@@ -30,6 +30,8 @@ class NeuralResponseMachine(object):
                        name="src_encoder", input='src_embedding')
 
 
+        # repmat & concat with tgt_embedding
+        # send to decoder rnn to generate sequence
 
 
 
