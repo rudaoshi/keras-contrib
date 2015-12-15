@@ -1,94 +1,73 @@
 __author__ = 'Sun'
 
 from keras.models import Sequential, Graph
-from keras.layers.core import Dense, Dropout, Activation, TimeDistributedDense, Reshape
+from keras.layers.core import Dense, Dropout, Activation, TimeDistributedDense, Reshape, RepeatVector, Merge
 from keras.layers.embeddings import Embedding
-from keras.layers.recurrent import LSTM
+from keras.layers.recurrent import LSTM, GRU
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 import numpy as np
 
 import codecs
+import keras.backend as K
+
+class Pass(MaskedLayer):
+    """ Do literally nothing
+        Can be the first layer
+    """
+    def __init__(self, ndim=2, dtype='int32', name=None):
+        super(Pass, self).__init__()
+        self.input = K.placeholder(ndim=ndim,
+                                dtype=dtype,
+                                name=name)
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        return X
 
 
-class NeuralResponseMachine(object):
+class GlobalNeuralResponseMachine(object):
 
+    def __init__(self, corpus):
 
-    def build(self, corpus):
+        self.corpus = corpus
+        self.model = None
 
+    def build(self):
 
-        graph = Graph()
-        graph.add_input(name='src_sequence', ndim=1, dtype='int32')
-        graph.add_input(name='tgt_sequence', ndim=1, dtype='int32')
+        self.model = Graph()
+        self.model.add_input(name='src_sequence', input_shape=(None,1), dtype='int32')
+        self.model.add_input(name='tgt_sequence', input_shape=(None,1), dtype='int32')
 
-        all_term_count = corpus.word_num()
+        all_term_count = self.corpus.word_num()
         embedding_layer = Embedding(all_term_count, 256)
-        graph.add_node(embedding_layer, name="src_embedding", input="src_sequence")
-        graph.add_node(embedding_layer, name="tgt_embedding", input="tgt_sequence")
+        self.model.add_shared_node(embedding_layer, name="embedding",
+                              inputs=["src_sequence","tgt_sequence"],
+                              outputs=["src_embedding", "tgt_embedding"])
 
-        graph.add_node(LSTM(256, 5120, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
+        self.model.add_node(GRU(input_dim=256, output_dim=128, return_sequences=False),
                        name="src_encoder", input='src_embedding')
 
+        self.model.add_node(GRU(input_dim=128, output_dim=128, return_sequences=True),
+                       name="decoder_gru", inputs=["src_encoder", "tgt_embedding"] )
+        self.model.add_node(TimeDistributedDense(input_dim=128, output_dim=self.corpus.word_num()),
+                       name="decoder_trans", input="decoder_gru" )
+        self.model.add_node(Activation('time_distributed_softmax'),
+                       name="decoder_active", input="decoder_trans" )
 
-        # repmat & concat with tgt_embedding
-        # send to decoder rnn to generate sequence
-
-
-
-
-
-        graph.add_input(name='entity_1_uri', ndim=2, dtype='int32')
-        graph.add_input(name='entity_2_term', ndim=2, dtype='int32')
-        graph.add_input(name='entity_2_uri', ndim=2, dtype='int32')
-        graph.add_input(name='entity_12_stat_sim', ndim=2)
-        #graph.add_input(name='entity_12_kb_sim', ndim=2)
-
-        graph.add_node(Embedding(all_term_count, 50), #, W_regularizer=l2(alpha)),
-            name="entity_1_term_embedding", input="entity_1_term")
-        graph.add_node(Convolution1D(50, 50, conv_window), #W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-         name="entity_1_term_conv", input="entity_1_term_embedding")
-        graph.add_node(Activation('sigmoid'), name="entity_1_term_act", input="entity_1_term_conv")
-        graph.add_node(MaxPooling1D(pool_length=pool_length), name="entity_1_term_pool", input="entity_1_term_act")
-        graph.add_node(Flatten(), name="entity_1_term_flatten", input="entity_1_term_pool")
-
-        graph.add_node(Embedding(all_uri_count, 50), #, W_regularizer=l2(alpha)),
-             name="entity_1_uri_embedding", input="entity_1_uri")
-        graph.add_node(Flatten(), name="entity_1_uri_flatten", input="entity_1_uri_embedding")
-
-        graph.add_node(Embedding(all_term_count, 50), # W_regularizer=l2(alpha)),
-             name="entity_2_term_embedding", input="entity_2_term")
-        graph.add_node(Convolution1D(50, 50, conv_window), # W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-            name="entity_2_term_conv", input="entity_2_term_embedding")
-        graph.add_node(Activation('sigmoid'), name="entity_2_term_act", input="entity_2_term_conv")
-        graph.add_node(MaxPooling1D(pool_length=pool_length), name="entity_2_term_pool", input="entity_2_term_act")
-        graph.add_node(Flatten(), name="entity_2_term_flatten", input="entity_2_term_pool")
-
-        graph.add_node(Embedding(all_uri_count, 50), #W_regularizer=l2(alpha)),
-            name="entity_2_uri_embedding", input="entity_2_uri")
-        graph.add_node(Flatten(), name="entity_2_uri_flatten", input="entity_2_uri_embedding")
-
-        graph.add_node(Dense(2*(50+50) + stat_sim_dim, 128), #W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-            name="entity_12_merge_trans1",
-                       inputs=["entity_1_term_flatten", "entity_1_uri_flatten",
-                               "entity_2_term_flatten", "entity_2_uri_flatten",
-                               "entity_12_stat_sim"])
-
-        graph.add_node(Activation('sigmoid'), name="entity_12_act1", input="entity_12_merge_trans1")
-        graph.add_node(Dense(128, 128), # W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-            name="entity_12_trans2", input="entity_12_act1")
-        graph.add_node(Activation('relu'), name="entity_12_act2", input="entity_12_trans2")
-        graph.add_node(Dense(128, 128), # W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-             name="entity_12_trans3", input="entity_12_act2")
-        graph.add_node(Activation('relu'), name="entity_12_act3", input="entity_12_trans3")
-        graph.add_node(Dense(128, 1), # W_regularizer=l2(alpha), activity_regularizer=activity_l2(alpha)),
-             name="entity_12_trans4", input="entity_12_act3")
-        graph.add_node(Activation('sigmoid'), name="entity_12_act4", input="entity_12_trans4")
-
-        graph.add_output(name='output', input='entity_12_act4')
-
-        graph.compile('adagrad', {'output':'binary_crossentropy'})
+        self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 
 
+
+    def train(self):
+
+        # "images" is a numpy float array of shape (nb_samples, nb_channels=3, width, height).
+        # "captions" is a numpy integer array of shape (nb_samples, max_caption_len)
+        # containing word index sequences representing partial captions.
+        # "next_words" is a numpy float array of shape (nb_samples, vocab_size)
+        # containing a categorical encoding (0s and 1s) of the next word in the corresponding
+        # partial caption.
+        self.model.fit([images, partial_captions], next_words, batch_size=16, nb_epoch=100)
 
 
 def train_rnn(character_corpus, seq_len, train_test_split_ratio):
