@@ -5,7 +5,7 @@ import numpy as np
 import jieba
 
 from collections import Counter
-
+from utils.data_process import to_time_distributed_categorical
 
 class WordSequenceCorpus(object):
     def __init__(self):
@@ -115,8 +115,11 @@ class WordSequenceCorpus(object):
     def get_sequence_map(self, categorical_output = False):
 
         if categorical_output:
-            to_time_distributed_categorical(seq_Y[:train_seq_num], character_corpus.char_num())
-        return self.corpus['src_input'], self.corpus['tgt_output']
+            output = to_time_distributed_categorical(self.corpus['tgt_output'], self.corpus.word_num())
+        else:
+            output = self.corpus['tgt_output']
+
+        return self.corpus['src_input'], output
 
 
 

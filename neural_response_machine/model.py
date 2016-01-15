@@ -21,25 +21,16 @@ class GlobalNeuralRespondingMachine(object):
 
     def build(self):
 
-        self.model = Graph()
-        self.model.add_input(name='src_sequence', input_shape=(None,1), dtype='int32')
-        self.model.add_input(name='tgt_sequence', input_shape=(None,1), dtype='int32')
+        self.model = Sequential()
 
         all_term_count = self.corpus.word_num()
-        embedding_layer = Embedding(all_term_count, 256)
-        self.model.add_shared_node(embedding_layer, name="embedding",
-                              inputs=["src_sequence","tgt_sequence"],
-                              outputs=["src_embedding", "tgt_embedding"])
+        self.model.add(Embedding(all_term_count, 256, mask_zero = True))
 
-        self.model.add_node(GRU(input_dim=256, output_dim=128, return_sequences=False),
-                       name="src_encoder", input='src_embedding')
+        self.model.add(GRU(input_dim=256, output_dim=128, return_sequences=False))
 
-        self.model.add_node(GRU(input_dim=128, output_dim=128, return_sequences=True),
-                       name="decoder_gru", inputs=["src_encoder", "tgt_embedding"] )
-        self.model.add_node(TimeDistributedDense(input_dim=128, output_dim=self.corpus.word_num()),
-                       name="decoder_trans", input="decoder_gru" )
-        self.model.add_node(Activation('time_distributed_softmax'),
-                       name="decoder_active", input="decoder_trans" )
+        self.model.add(GRU(input_dim=128, output_dim=128, return_sequences=True))
+        self.model.add(TimeDistributedDense(input_dim=128, output_dim=self.corpus.word_num()))
+        self.model.add(Activation('time_distributed_softmax'))
 
         self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 
@@ -47,7 +38,7 @@ class GlobalNeuralRespondingMachine(object):
 
     def train(self):
 
-        seq_X, seq_Y = self.corpus.get_sequence_map()
+        seq_X, seq_Y = self.corpus.get_sequence_map(categorical_output=True)
 
         print "Sequences are made"
 
