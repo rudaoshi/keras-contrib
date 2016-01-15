@@ -6,25 +6,12 @@ from keras.layers.embeddings import Embedding
 from keras.layers.recurrent import LSTM
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
-import numpy as np
+
 
 import codecs
 
 from sandbox.dynamic_title.creator.char_corpus import CharacterCorpus
 
-
-def to_time_distributed_categorical(y, nb_classes=None):
-
-    sample_size, time_steps = y.shape
-    if not nb_classes:
-        nb_classes = np.max(y)+1
-
-    Y = np.zeros((sample_size, time_steps, nb_classes))
-
-    for i in range(sample_size):
-        for j in range(time_steps):
-            Y[i, j, y[i, j]] = 1.
-    return Y
 
 def train_rnn(character_corpus, seq_len, train_test_split_ratio):
     model = Sequential()

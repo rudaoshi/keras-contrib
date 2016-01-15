@@ -8,25 +8,11 @@ from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 import numpy as np
 
-import codecs
-import keras.backend as K
-
-class Pass(MaskedLayer):
-    """ Do literally nothing
-        Can be the first layer
-    """
-    def __init__(self, ndim=2, dtype='int32', name=None):
-        super(Pass, self).__init__()
-        self.input = K.placeholder(ndim=ndim,
-                                dtype=dtype,
-                                name=name)
-
-    def get_output(self, train=False):
-        X = self.get_input(train)
-        return X
 
 
-class GlobalNeuralResponseMachine(object):
+
+
+class GlobalNeuralRespondingMachine(object):
 
     def __init__(self, corpus):
 
@@ -60,6 +46,29 @@ class GlobalNeuralResponseMachine(object):
 
 
     def train(self):
+
+        seq_X, seq_Y = self.corpus.get_sequence_map()
+
+        print "Sequences are made"
+
+        train_seq_num = train_test_split_ratio*seq_X.shape[0]
+        X_train = seq_X[:train_seq_num]
+        Y_train = to_time_distributed_categorical(seq_Y[:train_seq_num], character_corpus.char_num())
+
+        X_test = seq_X[train_seq_num:]
+        Y_test = to_time_distributed_categorical(seq_Y[train_seq_num:], character_corpus.char_num())
+
+        print "Begin train model"
+        checkpointer = ModelCheckpoint(filepath="model.step", verbose=1, save_best_only=True)
+        model.fit(X_train, Y_train, batch_size=256, nb_epoch=100, verbose=2, validation_data=(X_test, Y_test), callbacks=[checkpointer])
+
+        print "Model is trained"
+
+        score = model.evaluate(X_test, Y_test, batch_size=512)
+
+        print "valid score = ", score
+
+        return model
 
         # "images" is a numpy float array of shape (nb_samples, nb_channels=3, width, height).
         # "captions" is a numpy integer array of shape (nb_samples, max_caption_len)

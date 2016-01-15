@@ -3,7 +3,7 @@ __author__ = 'Sun'
 import codecs
 import numpy as np
 
-class CharacterCorpus(object):
+class CharSequenceCorpus(object):
     def __init__(self):
 
         self.char_id_map = dict()
