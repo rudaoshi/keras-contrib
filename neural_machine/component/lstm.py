@@ -15,7 +15,11 @@ LSTMModel = namedtuple("LSTMModel", ["rnn_exec", "symbol",
 class StackedLSTM(object):
 
 
-    def __init__(self, num_layer):
+    def __init__(self, num_layer, num_hidden, seq_len):
+
+        self.num_layer = num_layer
+        self.seq_len = seq_len
+        self.num_hidden = num_hidden
 
         self.param_cells = []
         self.last_states = []
@@ -30,78 +34,49 @@ class StackedLSTM(object):
 
 
 
-    def step(self):
-        def lstm(num_hidden, indata, prev_state, param, seqidx, layeridx, dropout=0.):
-            """LSTM Cell symbol"""
+    def step(self, data, seqidx, layeridx):
 
-            i2h = mx.sym.FullyConnected(data=indata,
-                                        weight=param.i2h_weight,
-                                        bias=param.i2h_bias,
-                                        num_hidden=num_hidden * 4,
-                                        name="t%d_l%d_i2h" % (seqidx, layeridx))
-            h2h = mx.sym.FullyConnected(data=prev_state.h,
-                                        weight=param.h2h_weight,
-                                        bias=param.h2h_bias,
-                                        num_hidden=num_hidden * 4,
-                                        name="t%d_l%d_h2h" % (seqidx, layeridx))
-            gates = i2h + h2h
-            slice_gates = mx.sym.SliceChannel(gates, num_outputs=4,
-                                              name="t%d_l%d_slice" % (seqidx, layeridx))
-            in_gate = mx.sym.Activation(slice_gates[0], act_type="sigmoid")
-            in_transform = mx.sym.Activation(slice_gates[1], act_type="tanh")
-            forget_gate = mx.sym.Activation(slice_gates[2], act_type="sigmoid")
-            out_gate = mx.sym.Activation(slice_gates[3], act_type="sigmoid")
-            next_c = (forget_gate * prev_state.c) + (in_gate * in_transform)
-            next_h = out_gate * mx.sym.Activation(next_c, act_type="tanh")
-            return LSTMState(c=next_c, h=next_h)
+        param = self.param_cells[layeridx]
+        prev_state = self.last_states[seqidx]
 
-
-    def call(self):
+        i2h = mx.sym.FullyConnected(data=data,
+                                    weight=param.i2h_weight,
+                                    bias=param.i2h_bias,
+                                    num_hidden=self.num_hidden * 4,
+                                    name="t%d_l%d_i2h" % (seqidx, layeridx))
+        h2h = mx.sym.FullyConnected(data=prev_state.h,
+                                    weight=param.h2h_weight,
+                                    bias=param.h2h_bias,
+                                    num_hidden=self.num_hidden * 4,
+                                    name="t%d_l%d_h2h" % (seqidx, layeridx))
+        gates = i2h + h2h
+        slice_gates = mx.sym.SliceChannel(gates, num_outputs=4,
+                                          name="t%d_l%d_slice" % (seqidx, layeridx))
+        in_gate = mx.sym.Activation(slice_gates[0], act_type="sigmoid")
+        in_transform = mx.sym.Activation(slice_gates[1], act_type="tanh")
+        forget_gate = mx.sym.Activation(slice_gates[2], act_type="sigmoid")
+        out_gate = mx.sym.Activation(slice_gates[3], act_type="sigmoid")
+        next_c = (forget_gate * prev_state.c) + (in_gate * in_transform)
+        next_h = out_gate * mx.sym.Activation(next_c, act_type="tanh")
+        return LSTMState(c=next_c, h=next_h)
 
 
-        embed_weight = mx.sym.Variable("embed_weight")
-        cls_weight = mx.sym.Variable("cls_weight")
-        cls_bias = mx.sym.Variable("cls_bias")
-        param_cells = []
-        last_states = []
-        for i in range(num_lstm_layer):
-            param_cells.append(LSTMParam(i2h_weight=mx.sym.Variable("l%d_i2h_weight" % i),
-                                         i2h_bias=mx.sym.Variable("l%d_i2h_bias" % i),
-                                         h2h_weight=mx.sym.Variable("l%d_h2h_weight" % i),
-                                         h2h_bias=mx.sym.Variable("l%d_h2h_bias" % i)))
-            state = LSTMState(c=mx.sym.Variable("l%d_init_c" % i),
-                              h=mx.sym.Variable("l%d_init_h" % i))
-            last_states.append(state)
-        assert (len(last_states) == num_lstm_layer)
-
-        # embeding layer
-        data = mx.sym.Variable('data')
-        label = mx.sym.Variable('softmax_label')
-        embed = mx.sym.Embedding(data=data, input_dim=input_size,
-                                 weight=embed_weight, output_dim=num_embed, name='embed')
-        wordvec = mx.sym.SliceChannel(data=embed, num_outputs=seq_len, squeeze_axis=1)
+    def call(self, data):
 
         hidden_all = []
-        for seqidx in range(seq_len):
-            hidden = wordvec[seqidx]
+        for seqidx in range(self.seq_len):
+            hidden = data[seqidx]
 
             # stack LSTM
-            for i in range(num_lstm_layer):
-                if i == 0:
-                    dp_ratio = 0.
-                else:
-                    dp_ratio = dropout
-                next_state = lstm(num_hidden, indata=hidden,
-                                  prev_state=last_states[i],
-                                  param=param_cells[i],
-                                  seqidx=seqidx, layeridx=i, dropout=dp_ratio)
+            for i in range(self.num_layer):
+                next_state = self.step(hidden, seqidx, i)
                 hidden = next_state.h
-                last_states[i] = next_state
-            # decoder
-            if dropout > 0.:
-                hidden = mx.sym.Dropout(data=hidden, p=dropout)
+                self.last_states[i] = next_state
+
             hidden_all.append(hidden)
 
         hidden_concat = mx.sym.Concat(*hidden_all, dim=0)
-        pred = mx.sym.FullyConnected(data=hidden_concat, num_hidden=num_label,
-                                     weight=cls_weight, bias=cls_bias, name='pred')
+
+        return hidden_concat
+
+
