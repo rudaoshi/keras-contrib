@@ -3,6 +3,8 @@ __author__ = 'Sun'
 import codecs
 import numpy as np
 
+import logging
+
 class SequenceCorpus(object):
     def __init__(self):
 
@@ -10,11 +12,19 @@ class SequenceCorpus(object):
         self.id_cell_map = dict()
 
         self.corpus = []
-        self.cell_id_map["<start>"] = 0
-        self.id_cell_map[0] = "<start>"
+
+        # 0 is reserved for padding
+        self.cell_id_map[""] = 0
+        self.id_cell_map[0] = ""
+
+#        self.cell_id_map["<start>"] = 1
+#        self.id_cell_map[1] = "<start>"
 
         self.cell_id_map["<eos>"] = 1
         self.id_cell_map[1] = "<eos>"
+
+        self.cell_id_map["<unk>"] = 2
+        self.id_cell_map[2] = "<unk>"
 
     def build(self, data_file, segmentor):
 
@@ -23,11 +33,11 @@ class SequenceCorpus(object):
             cells = segmentor.segment(line)
 
             cur_curpus = [0] * (len(cells) + 2)
-            cur_curpus[0] = 0
-            cur_curpus[-1] = 1
+            cur_curpus[0] = 1
+            cur_curpus[-1] = 2
 
             for idx in range(1, len(cells) + 1):
-                cell = cells[idx]
+                cell = cells[idx-1]
                 if cell not in self.cell_id_map:
                     id = len(self.cell_id_map)
                     self.cell_id_map[cell] = id
@@ -37,12 +47,38 @@ class SequenceCorpus(object):
 
                 cur_curpus[idx] = id
 
-            self.corpus.extend(cur_curpus)
+            self.corpus.append(cur_curpus)
 
-        print "Corpus build."
-        print "Character num = ", len(self.cell_id_map)
-        print "Corpus size = ", len(self.corpus)
+        logging.info("Corpus build.")
+        logging.info("Character num = {}".format(len(self.cell_id_map)))
+        logging.info("Corpus size = {}".format(len(self.corpus)))
 
+    def make(self, data_file, segmentor):
+
+        corpus = SequenceCorpus()
+        corpus.cell_id_map = self.cell_id_map
+        corpus.id_cell_map = self.id_cell_map
+
+        for line in data_file:
+
+            cells = segmentor.segment(line)
+
+            cur_curpus = [0] * (len(cells) + 2)
+            cur_curpus[0] = 1
+            cur_curpus[-1] = 2
+
+            for idx in range(1, len(cells) + 1):
+                cell = cells[idx-1]
+                if cell not in self.cell_id_map:
+                    id = self.id_cell_map["<unk>"]
+                else:
+                    id = self.cell_id_map[cell]
+
+                cur_curpus[idx] = id
+
+            corpus.corpus.append(cur_curpus)
+
+        return corpus
 
     def id(self, cell):
         return self.cell_id_map[cell]
@@ -56,18 +92,5 @@ class SequenceCorpus(object):
     def corpus_size(self):
         return len(self.corpus)
 
-    def make_sequences(self, seq_length):
 
-        if len(self.corpus) % seq_length != 0:
-            print "cutting of the end of data"
-
-        seq_num = len(self.corpus) / seq_length
-        x = self.corpus[: seq_num * seq_length]
-
-        y = x[1:]; y.append(x[0])
-
-        seq_X = np.array(x).reshape((seq_num, seq_length))
-        seq_Y = np.array(y).reshape((seq_num, seq_length))
-
-        return (seq_X, seq_Y)
 

@@ -4,12 +4,12 @@ import numpy as np
 import mxnet as mx
 
 from neural_machine.tasks.language.common.problem import Problem
-from neural_machine.component.lstm import StackedLSTM
+from neural_machine.component.lstm import StackedLSTM, SequenceDecoder
 
-class LanguageModelProblem(Problem):
+class DialogProblem(Problem):
 
     def __init__(self, corpus):
-        super(LanguageModelProblem, self).__init__(corpus)
+        super(DialogProblem, self).__init__(corpus)
 
     def is_supervised(self):
         return True
@@ -47,7 +47,7 @@ class LanguageModelProblem(Problem):
         return np.exp(loss / label.size)
 
 
-class LanguageModelArchParam(object):
+class DialogModelArchParam(object):
 
     def __init__(self, num_hidden, num_embed,
                  num_lstm_layer, cell_num):
@@ -57,14 +57,14 @@ class LanguageModelArchParam(object):
         self.num_lstm_layer = num_lstm_layer
         self.cell_num = cell_num
 
-class LanguageModelLearnParam(object):
+class DialogModelLearnParam(object):
 
     def __init__(self, num_epoch, learning_rate, momentum):
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.momentum = momentum
 
-class LanguageModel(object):
+class DialogModel(object):
 
     def __init__(self, param):
 
@@ -86,10 +86,18 @@ class LanguageModel(object):
                                  weight=embed_weight, output_dim=self.param.num_embed, name='embed')
         wordvec = mx.sym.SliceChannel(data=embed, num_outputs=seq_len, squeeze_axis=1)
 
-        lstm = StackedLSTM(self.param.num_lstm_layer,
-                           self.param.num_hidden, seq_len)(wordvec)
+        encoder_out, states = StackedLSTM(self.param.num_lstm_layer,
+                           self.param.num_hidden, seq_len, name = "encoder",
+                              return_sequence=False,
+                              output_states=True)(wordvec)
 
-        pred = mx.sym.FullyConnected(data=lstm, num_hidden=self.param.cell_num,
+        decoder_out = SequenceDecoder(self.param.num_lstm_layer,
+                           self.param.num_hidden, seq_len, name = "decoder",
+                              init_states=states,
+                              return_sequence=True,
+                              output_states=False)(encoder_out)
+
+        pred = mx.sym.FullyConnected(data=decoder_out, num_hidden=self.param.cell_num,
                                      weight=cls_weight, bias=cls_bias, name='pred')
 
         ################################################################################
@@ -125,16 +133,17 @@ class LanguageModel(object):
 
         init_states = RepeatedAppendIter(
             [np.zeros((batch_size, self.param.num_hidden))] * 4,
-            ['l{0}_init_{1}'.format(l, t)
+            ["encoder" + 'l{0}_init_{1}'.format(l, t)
              for l in range(self.param.num_lstm_layer)
              for t in ["c", "h"]])
 
         train_iter = MergeIter(data_train, init_states)
         val_iter = MergeIter(data_val, init_states)
 
+        print train_iter.provide_data
 
         self.model.fit(X=train_iter, eval_data=val_iter,
-                  eval_metric=mx.metric.np(LanguageModelProblem.objective),
+                  eval_metric=mx.metric.np(DialogProblem.objective),
                   batch_end_callback=mx.callback.Speedometer(batch_size, 50), )
 
 
@@ -176,29 +185,29 @@ if __name__ == '__main__':
     corpus.build(open(sys.argv[1], 'r'), segmenter)
     cell_num = corpus.cell_num()
 
-    problem = LanguageModelProblem(corpus)
+    problem = DialogProblem(corpus)
 
     batch_size = 32
 
     data_train = BucketIter(problem, batch_size)
 
     val_corpus = corpus.make(open(sys.argv[2], 'r'), segmenter)
-    val_problem = LanguageModelProblem(val_corpus)
+    val_problem = DialogProblem(val_corpus)
     data_val = BucketIter(val_problem, batch_size)
 
 
-    arch_param = LanguageModelArchParam(
+    arch_param = DialogModelArchParam(
         num_hidden= 200,
         num_embed= 200,
         num_lstm_layer= 2,
         cell_num = corpus.cell_num()
     )
 
-    learning_param = LanguageModelLearnParam(
+    learning_param = DialogModelLearnParam(
         num_epoch=25,learning_rate=0.01, momentum=0.0
     )
 
-    lm = LanguageModel(arch_param)
+    lm = DialogModel(arch_param)
 
     lm.train(data_train, data_val, learning_param)
 
