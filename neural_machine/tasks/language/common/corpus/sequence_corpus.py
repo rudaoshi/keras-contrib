@@ -26,28 +26,34 @@ class SequenceCorpus(object):
         self.cell_id_map["<unk>"] = 2
         self.id_cell_map[2] = "<unk>"
 
+    def update(self, seq, segmentor):
+
+        cells = segmentor.segment(seq)
+
+        cur_curpus = [0] * (len(cells) + 2)
+        cur_curpus[0] = 1
+        cur_curpus[-1] = 2
+
+        for idx in range(1, len(cells) + 1):
+            cell = cells[idx - 1]
+            if cell not in self.cell_id_map:
+                id = len(self.cell_id_map)
+                self.cell_id_map[cell] = id
+                self.id_cell_map[id] = cell
+            else:
+                id = self.cell_id_map[cell]
+
+            cur_curpus[idx] = id
+
+        self.corpus.append(cur_curpus)
+
     def build(self, data_file, segmentor):
 
         for line in data_file:
 
-            cells = segmentor.segment(line)
+            self.update(line, segmentor)
 
-            cur_curpus = [0] * (len(cells) + 2)
-            cur_curpus[0] = 1
-            cur_curpus[-1] = 2
 
-            for idx in range(1, len(cells) + 1):
-                cell = cells[idx-1]
-                if cell not in self.cell_id_map:
-                    id = len(self.cell_id_map)
-                    self.cell_id_map[cell] = id
-                    self.id_cell_map[id] = cell
-                else:
-                    id = self.cell_id_map[cell]
-
-                cur_curpus[idx] = id
-
-            self.corpus.append(cur_curpus)
 
         logging.info("Corpus build.")
         logging.info("Character num = {}".format(len(self.cell_id_map)))
