@@ -6,10 +6,14 @@ import numpy as np
 import logging
 
 class SequenceCorpus(object):
-    def __init__(self):
+    def __init__(self, with_start = False, with_end = False, with_unk = False):
 
         self.cell_id_map = dict()
         self.id_cell_map = dict()
+
+        self.with_start = with_start
+        self.with_end = with_end
+        self.with_unk = with_unk
 
         self.corpus = []
 
@@ -17,25 +21,29 @@ class SequenceCorpus(object):
         self.cell_id_map[""] = 0
         self.id_cell_map[0] = ""
 
-#        self.cell_id_map["<start>"] = 1
-#        self.id_cell_map[1] = "<start>"
+        if with_start:
+            id = len(self.cell_id_map)
+            self.cell_id_map["<start>"] = id
+            self.id_cell_map[id] = "<start>"
 
-        self.cell_id_map["<eos>"] = 1
-        self.id_cell_map[1] = "<eos>"
+        if with_end:
+            id = len(self.cell_id_map)
+            self.cell_id_map["<eos>"] = id
+            self.id_cell_map[id] = "<eos>"
 
-        self.cell_id_map["<unk>"] = 2
-        self.id_cell_map[2] = "<unk>"
+        if with_unk:
+            id = len(self.cell_id_map)
+            self.cell_id_map["<unk>"] = id
+            self.id_cell_map[id] = "<unk>"
 
     def update(self, seq, segmentor):
 
         cells = segmentor.segment(seq)
 
-        cur_curpus = [0] * (len(cells) + 2)
-        cur_curpus[0] = 1
-        cur_curpus[-1] = 2
+        cur_corpus = [0] * len(cells)
 
-        for idx in range(1, len(cells) + 1):
-            cell = cells[idx - 1]
+        for idx in range(len(cells)):
+            cell = cells[idx]
             if cell not in self.cell_id_map:
                 id = len(self.cell_id_map)
                 self.cell_id_map[cell] = id
@@ -43,9 +51,41 @@ class SequenceCorpus(object):
             else:
                 id = self.cell_id_map[cell]
 
-            cur_curpus[idx] = id
+            cur_corpus[idx] = id
 
-        self.corpus.append(cur_curpus)
+        if self.with_start:
+            cur_corpus = [self.id("<start>")] + cur_corpus
+        if self.with_end:
+            cur_corpus = cur_corpus + [self.id("<eos>")]
+
+        self.corpus.append(cur_corpus)
+
+
+    def predict(self, seq, segmentor):
+
+        cells = segmentor.segment(seq)
+
+        cur_corpus = [0] * len(cells)
+
+        for idx in range(len(cells)):
+            cell = cells[idx]
+            if cell not in self.cell_id_map:
+                if self.with_unk:
+                    id = self.id("<unk>")
+                else:
+                    raise Exception("Unknown cell found. the repo should build with with_unk = True")
+            else:
+                id = self.cell_id_map[cell]
+
+            cur_corpus[idx] = id
+
+        if self.with_start:
+            cur_corpus = [self.id("<start>")] + cur_corpus
+        if self.with_end:
+            cur_corpus = cur_corpus + [self.id("<eos>")]
+
+        return cur_corpus
+
 
     def build(self, data_file, segmentor):
 
@@ -61,26 +101,12 @@ class SequenceCorpus(object):
 
     def make(self, data_file, segmentor):
 
-        corpus = SequenceCorpus()
+        corpus = SequenceCorpus(self.with_start, self.with_end, self.with_unk)
         corpus.cell_id_map = self.cell_id_map
         corpus.id_cell_map = self.id_cell_map
 
         for line in data_file:
-
-            cells = segmentor.segment(line)
-
-            cur_curpus = [0] * (len(cells) + 2)
-            cur_curpus[0] = 1
-            cur_curpus[-1] = 2
-
-            for idx in range(1, len(cells) + 1):
-                cell = cells[idx-1]
-                if cell not in self.cell_id_map:
-                    id = self.id_cell_map["<unk>"]
-                else:
-                    id = self.cell_id_map[cell]
-
-                cur_curpus[idx] = id
+            cur_curpus = self.predict(line, segmentor)
 
             corpus.corpus.append(cur_curpus)
 

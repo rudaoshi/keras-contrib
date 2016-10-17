@@ -101,6 +101,55 @@ class StackedLSTM(object):
             return output_data, self.last_states[-1]
 
 
+class BidirectionalStackedLSTM(object):
+
+
+    def __init__(self, num_layer, num_hidden, seq_len,
+                 name = "",
+                 forward_init_states = None,
+                 backward_init_states = None,
+                 return_sequence=True,
+                 output_states = False):
+
+        self.num_layer = num_layer
+        self.seq_len = seq_len
+        self.return_sequence = return_sequence
+        self.output_states = output_states
+        self.name = name
+
+        self.forward_lstm = StackedLSTM(num_layer, num_hidden, seq_len, name = "forward_" + self.name, init_states=forward_init_states)
+        self.backward_lstm = StackedLSTM(num_layer, num_hidden, seq_len, name = "backward_" + self.name, init_states=backward_init_states)
+
+
+
+    def __call__(self, data):
+
+        hidden_all = []
+        for seqidx in range(self.seq_len):
+            forward_hidden = data[seqidx]
+            backword_hidden = data[self.seq_len - seqidx - 1 ]
+
+            # stack LSTM
+            for i in range(self.num_layer):
+                next_forward_state = self.forward_lstm.step(forward_hidden, seqidx, i)
+                forward_hidden = next_forward_state.h
+                self.forward_lstm.last_states[i] = next_forward_state
+
+
+
+            hidden_all.append(hidden)
+
+        if self.return_sequence:
+            hidden_concat = mx.sym.Concat(*hidden_all, dim=0)
+
+            output_data =  hidden_concat
+        else:
+            output_data = hidden_all[-1]
+
+        if self.output_states:
+            return output_data, self.last_states[-1]
+
+
 class SequenceDecoder(StackedLSTM):
 
     def __init__(self, * args, ** kwargs):

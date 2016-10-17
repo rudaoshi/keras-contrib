@@ -62,11 +62,47 @@ class LearnParam(object):
         self.learning_rate = learning_rate
         self.momentum = momentum
 
-class SenquenceTaggingModel(object):
 
-    def __init__(self, param):
+class MaskedSoftmax(mx.operator.NumpyOp):
+    def __init__(self, mask):
+        super(MaskedSoftmax, self).__init__(False)
+        self.mask = mask
+
+    def list_arguments(self):
+        return ['data', 'label']
+
+    def list_outputs(self):
+        return ['output']
+
+    def infer_shape(self, in_shape):
+        data_shape = in_shape[0]
+        label_shape = (in_shape[0][0],)
+        output_shape = in_shape[0]
+        return [data_shape, label_shape], [output_shape]
+
+    def forward(self, in_data, out_data):
+        x = in_data[0]
+        y = out_data[0]
+        y[:] = np.exp(x - x.max(axis=1).reshape((x.shape[0], 1)))
+        y /= y.sum(axis=1).reshape((x.shape[0], 1))
+
+    def backward(self, out_grad, in_data, out_data, in_grad):
+        l = in_data[1]
+        l = l.reshape((l.size,)).astype(np.int)
+        y = out_data[0]
+        dx = in_grad[0]
+        dx[:] = y
+        dx[np.arange(l.shape[0]), l] -= 1.0
+
+        dx[np.arange(l.shape[0]), l==self.mask] = 0.0
+
+
+class PartialLabeledSenquenceTaggingModel(object):
+
+    def __init__(self, param, unlabeled_tag_id):
 
         self.param = param
+        self.mask = unlabeled_tag_id
 
     def __build(self, bucket):
 
@@ -103,7 +139,7 @@ class SenquenceTaggingModel(object):
         # label = mx.sym.Reshape(data=label, target_shape=(0,))
         ################################################################################
 
-        sm = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+        sm = mx.sym.MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
 
         return sm
 
@@ -173,10 +209,10 @@ if __name__ == '__main__':
 
 
     segmenter = CharacterSegmenter()
-    corpus = SequencePairCorpus()
+    corpus = SequencePairCorpus(source_with_unk=True)
 
-    corpus.build(open(sys.argv[1], 'r'), segmenter, segmenter, segmenter)
-    cell_num = corpus.cell_num()
+    corpus.build(open(sys.argv[1], 'r'), segmenter, segmenter)
+    cell_num = corpus.source_corpus.cell_num()
 
     problem = SequenceTaggingProblem(corpus)
 
@@ -193,14 +229,15 @@ if __name__ == '__main__':
         num_hidden= 200,
         num_embed= 200,
         num_lstm_layer= 2,
-        cell_num = corpus.cell_num()
+        cell_num = cell_num
     )
 
     learning_param = LearnParam(
         num_epoch=25,learning_rate=0.01, momentum=0.0
     )
 
-    lm = SenquenceTaggingModel(arch_param)
+    unlabeled_tag_id = corpus.target_corpus.id("U")
+    lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
 
     lm.train(data_train, None, learning_param)
 

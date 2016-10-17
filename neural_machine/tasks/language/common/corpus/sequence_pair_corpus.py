@@ -10,10 +10,13 @@ from neural_machine.tasks.language.common.corpus.sequence_corpus import Sequence
 from utils.data_process import to_time_distributed_categorical
 
 class SequencePairCorpus(object):
-    def __init__(self):
+    def __init__(self,
+                 source_with_start=False, source_with_end = False, source_with_unk = False,
+                 target_with_start=False, target_with_end=False, target_with_unk=False,
+                 ):
 
-        self.source_corpus = SequenceCorpus()
-        self.target_corpus = SequenceCorpus()
+        self.source_corpus = SequenceCorpus(source_with_start, source_with_end, source_with_unk)
+        self.target_corpus = SequenceCorpus(target_with_start, target_with_end, target_with_unk)
 
         self.corpus = []
 
