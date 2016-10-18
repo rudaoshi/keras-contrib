@@ -4,7 +4,7 @@ import numpy as np
 import mxnet as mx
 
 from neural_machine.tasks.language.common.problem import Problem
-from neural_machine.component.lstm import StackedLSTM
+from neural_machine.component.lstm import StackedLSTM, BidirectionalStackedLSTM
 
 class SequenceTaggingProblem(Problem):
 
@@ -120,8 +120,8 @@ class PartialLabeledSenquenceTaggingModel(object):
                                  weight=embed_weight, output_dim=self.param.num_embed, name='embed')
         wordvec = mx.sym.SliceChannel(data=embed, num_outputs=seq_len, squeeze_axis=1)
 
-        lstm = StackedLSTM(self.param.num_lstm_layer,
-                           self.param.num_hidden, seq_len)(wordvec)
+        lstm = BidirectionalStackedLSTM(self.param.num_lstm_layer,
+                           self.param.num_hidden, seq_len, return_sequence=True)(wordvec)
 
         pred = mx.sym.FullyConnected(data=lstm, num_hidden=self.param.cell_num,
                                      weight=cls_weight, bias=cls_bias, name='pred')
@@ -158,10 +158,11 @@ class PartialLabeledSenquenceTaggingModel(object):
                                           initializer=mx.init.Xavier(factor_type="in", magnitude=2.34))
 
         init_states = RepeatedAppendIter(
-            [np.zeros((batch_size, self.param.num_hidden))] * 4,
-            ['l{0}_init_{1}'.format(l, t)
+            [np.zeros((batch_size, self.param.num_hidden))] * 8,
+            ['{0}_l{1}_init_{2}'.format(direction, l, t)
              for l in range(self.param.num_lstm_layer)
-             for t in ["c", "h"]])
+             for t in ["c", "h"]
+             for direction in ["forward", "backward"]])
 
         train_iter = MergeIter(data_train, init_states)
 

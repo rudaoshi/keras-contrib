@@ -99,6 +99,8 @@ class StackedLSTM(object):
 
         if self.output_states:
             return output_data, self.last_states[-1]
+        else:
+            return output_data
 
 
 class BidirectionalStackedLSTM(object):
@@ -121,13 +123,13 @@ class BidirectionalStackedLSTM(object):
         self.backward_lstm = StackedLSTM(num_layer, num_hidden, seq_len, name = "backward_" + self.name, init_states=backward_init_states)
 
 
-
     def __call__(self, data):
 
-        hidden_all = []
+        forward_hidden_all = []
+        backward_hidden_all = []
         for seqidx in range(self.seq_len):
             forward_hidden = data[seqidx]
-            backword_hidden = data[self.seq_len - seqidx - 1 ]
+            backward_hidden = data[self.seq_len - seqidx - 1 ]
 
             # stack LSTM
             for i in range(self.num_layer):
@@ -135,19 +137,31 @@ class BidirectionalStackedLSTM(object):
                 forward_hidden = next_forward_state.h
                 self.forward_lstm.last_states[i] = next_forward_state
 
+            for i in range(self.num_layer):
+                next_backward_state = self.backward_lstm.step(backward_hidden, seqidx, i)
+                backward_hidden = next_backward_state.h
+                self.backward_lstm.last_states[i] = next_backward_state
 
+            forward_hidden_all.append(forward_hidden)
+            backward_hidden_all.append(backward_hidden)
 
-            hidden_all.append(hidden)
 
         if self.return_sequence:
+            hidden_all = []
+            for i in range(self.seq_len):
+                j = self.seq_len - i - 1
+                hidden_all.append(mx.sym.Concat(*[forward_hidden_all[i], backward_hidden_all[j]], dim=1))
+
             hidden_concat = mx.sym.Concat(*hidden_all, dim=0)
 
             output_data =  hidden_concat
         else:
-            output_data = hidden_all[-1]
+            output_data = mx.sym.Concat(*[forward_hidden_all[-1], backward_hidden_all[-1]], dim=1)
 
         if self.output_states:
-            return output_data, self.last_states[-1]
+            return output_data, self.forward_lstm.last_states[-1], self.backward_lstm.last_states[-1]
+        else:
+            return output_data
 
 
 class SequenceDecoder(StackedLSTM):
