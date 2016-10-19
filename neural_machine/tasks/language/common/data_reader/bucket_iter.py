@@ -115,7 +115,7 @@ class BucketIter(mx.io.DataIter):
         if tl > 0:
             buckets.append(max_bucket)
 
-        logging.info("Buckets: {0}".format(buckets))
+        logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
         return buckets, max_bucket
 

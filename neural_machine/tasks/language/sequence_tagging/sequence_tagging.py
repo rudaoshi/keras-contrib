@@ -148,7 +148,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-        contexts = [mx.context.cpu(i) for i in range(1)]
+        contexts = [mx.context.gpu(i) for i in range(4)]
         self.model = mx.model.FeedForward(ctx=contexts,
                                           symbol=self.symbol,
                                           num_epoch=learning_param.num_epoch,
@@ -242,5 +242,6 @@ if __name__ == '__main__':
     unlabeled_tag_id = corpus.target_corpus.id("U")
     lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
 
+    logging.log("Begin to train ...")
     lm.train(data_train, None, learning_param)
 
