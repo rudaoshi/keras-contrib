@@ -87,6 +87,7 @@ class MaskedSoftmax(mx.operator.NumpyOp):
         y /= y.sum(axis=1).reshape((x.shape[0], 1))
 
     def backward(self, out_grad, in_data, out_data, in_grad):
+        logging.log(logging.DEBUG, "In Data:" + " ".join([str(x.shape) for x in in_data]))
         l = in_data[1]
         l = l.reshape((l.size,)).astype(np.int)
         y = out_data[0]
@@ -148,7 +149,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-        contexts = [mx.context.gpu(i) for i in range(4)]
+        contexts = [mx.context.cpu(i) for i in range(2)]
         self.model = mx.model.FeedForward(ctx=contexts,
                                           symbol=self.symbol,
                                           num_epoch=learning_param.num_epoch,
