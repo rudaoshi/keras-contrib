@@ -203,6 +203,8 @@ import sys
 
 import logging
 
+import codecs
+
 if __name__ == '__main__':
 
     head = '%(asctime)-15s %(message)s'
@@ -212,7 +214,7 @@ if __name__ == '__main__':
     segmenter = CharacterSegmenter()
     corpus = SequencePairCorpus(source_with_unk=True)
 
-    corpus.build(open(sys.argv[1], 'r'), segmenter, segmenter)
+    corpus.build(codecs.open(sys.argv[1], 'r', encoding = "utf8"), segmenter, segmenter)
     cell_num = corpus.source_corpus.cell_num()
 
     problem = SequenceTaggingProblem(corpus)

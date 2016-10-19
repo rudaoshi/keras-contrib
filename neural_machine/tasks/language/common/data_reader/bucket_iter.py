@@ -106,7 +106,7 @@ class BucketIter(mx.io.DataIter):
         tl = 0
         buckets = []
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
-            logging.info("Buckets: {0} {1}".format(bucket, cap))
+
             if cap + tl >= batch_size:
                 buckets.append(bucket)
                 tl = 0
@@ -114,6 +114,8 @@ class BucketIter(mx.io.DataIter):
                 tl += cap
         if tl > 0:
             buckets.append(max_bucket)
+
+        logging.info("Buckets: {0}".format(buckets))
 
         return buckets, max_bucket
 
