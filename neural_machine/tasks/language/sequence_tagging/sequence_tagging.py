@@ -139,7 +139,7 @@ class PartialLabeledSenquenceTaggingModel(object):
         # label = mx.sym.Reshape(data=label, target_shape=(0,))
         ################################################################################
 
-        sm = mx.sym.MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
+        sm = MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
 
         return sm
 
