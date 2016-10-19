@@ -94,7 +94,7 @@ class MaskedSoftmax(mx.operator.NumpyOp):
         dx[:] = y
         dx[np.arange(l.shape[0]), l] -= 1.0
 
-        dx[np.arange(l.shape[0]), l==self.mask] = 0.0
+        #dx[np.arange(l.shape[0]), l==self.mask] = 0.0
 
 
 class PartialLabeledSenquenceTaggingModel(object):
