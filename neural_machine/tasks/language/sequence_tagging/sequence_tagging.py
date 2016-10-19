@@ -242,6 +242,6 @@ if __name__ == '__main__':
     unlabeled_tag_id = corpus.target_corpus.id("U")
     lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
 
-    logging.log("Begin to train ...")
+    logging.log(logging.INFO, "Begin to train ...")
     lm.train(data_train, None, learning_param)
 
