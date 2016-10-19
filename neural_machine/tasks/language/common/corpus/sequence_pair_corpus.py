@@ -2,7 +2,6 @@ __author__ = 'Sun'
 
 import codecs
 import numpy as np
-import jieba
 
 import itertools
 from collections import Counter
