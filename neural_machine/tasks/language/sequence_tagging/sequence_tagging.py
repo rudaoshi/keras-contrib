@@ -26,8 +26,8 @@ class MaskedAccuracy(EvalMetric):
             label = label.reshape((label.size,)).asnumpy().astype('int32')
 
             check_label_shapes(label, pred_label)
-            pred_label = pred_label[np.logical_and(label!=self.mask, label!=0)]
-            label = label[np.logical_and(label!=self.mask ,label!=0)]
+            #pred_label = pred_label[np.logical_and(label!=self.mask, label!=0)]
+            #label = label[np.logical_and(label!=self.mask ,label!=0)]
 
             self.sum_metric += (pred_label.flat == label.flat).sum()
             self.num_inst += len(pred_label.flat)
@@ -126,8 +126,8 @@ class MaskedSoftmax(mx.operator.CustomOp):
         #logging.log(logging.DEBUG, "l = {0}, y = {1}".format(l.shape, y.shape))
 
         y[np.arange(l.shape[0]), l] -= 1.0
-        y[l == self.mask, :] = 0.0
-        y[l == 0, : ] = 0.0  # padding
+        #y[l == self.mask, :] = 0.0
+        #y[l == 0, : ] = 0.0  # padding
         self.assign(in_grad[0], req[0], mx.nd.array(y))
 
 
@@ -221,7 +221,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         val_iter = None
         if data_val:
-            val_iter = MergeIter(data_val, self.init_states)
+            val_iter = MergeIter(data_val, init_states)
 
 
         self.model.fit(X=train_iter, eval_data=val_iter,
