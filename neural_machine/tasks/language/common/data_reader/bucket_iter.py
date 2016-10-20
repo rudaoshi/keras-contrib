@@ -117,7 +117,7 @@ class BucketIter(mx.io.DataIter):
                     head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
                     head_bucket_update = True
                 else:
-                    diff = min([head_bucket[i] - bucket[i] for i in len(bucket)])
+                    diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
                     if diff < 0:
                         head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
                         head_bucket_update = True
