@@ -217,7 +217,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
 
 
-        train_iter = MergeIter(data_train, self.init_states)
+        train_iter = MergeIter(data_train, init_states)
 
         val_iter = None
         if data_val:
