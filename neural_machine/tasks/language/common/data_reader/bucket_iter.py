@@ -123,7 +123,7 @@ class BucketIter(mx.io.DataIter):
                         head_bucket_update = True
 
             if head_bucket_update:
-                buckets.append(head_bucket)
+                buckets.append(tuple(head_bucket))
                 tl = 0
                 head_bucket_update = False
             else:
