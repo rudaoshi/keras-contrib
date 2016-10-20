@@ -265,7 +265,7 @@ import click
 @click.command()
 @click.argument("training_data")
 @click.option("--batch_size", type=click.INT, default = 100)
-@click.option("--dev", choices=["gpu", "cpu"], default="cpu")
+@click.option("--dev", type=click.Choice(['gpu', 'cpu']), default="cpu")
 @click.option("--nworker", type=click.INT, default=2)
 def train_model(training_data, batch_size, dev, nworker):
 
