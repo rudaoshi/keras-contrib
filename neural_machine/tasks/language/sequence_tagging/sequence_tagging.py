@@ -189,7 +189,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-        contexts = [mx.context.gpu(i) for i in range(4)]
+        contexts = [mx.context.cpu(i) for i in range(8)]
         self.model = mx.model.FeedForward(ctx=contexts,
                                           symbol=self.symbol,
                                           num_epoch=learning_param.num_epoch,
