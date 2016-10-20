@@ -226,7 +226,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.model.fit(X=train_iter, eval_data=val_iter,
                   eval_metric=MaskedAccuracy(self.mask),
-                  batch_end_callback=mx.callback.Speedometer(batch_size, 50), )
+                  batch_end_callback=mx.callback.Speedometer(learning_param.batch_size, 50), )
 
 
     def show_shape_info(self, data_train):
