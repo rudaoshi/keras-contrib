@@ -95,7 +95,7 @@ import logging
 class BucketIter(mx.io.DataIter):
 
 
-    def gen_buckets(self, batch_size):
+    def gen_buckets(self, batch_size, max_pad_num):
         shape_cap_map = Counter()
 
         for sample in self.problem.samples():
@@ -108,14 +108,28 @@ class BucketIter(mx.io.DataIter):
         max_bucket = tuple(np.max(np.array(shape_cap_map.keys()),axis=0))
         tl = 0
         buckets = []
+        head_bucket = None
+        head_bucket_update = False
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
             if cap + tl >= batch_size:
-                buckets.append(bucket)
+                if not head_bucket:
+                    head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
+                    head_bucket_update = True
+                else:
+                    diff = min([head_bucket[i] - bucket[i] for i in len(bucket)])
+                    if diff < 0:
+                        head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
+                        head_bucket_update = True
+
+            if head_bucket_update:
+                buckets.append(head_bucket)
                 tl = 0
+                head_bucket_update = False
             else:
                 tl += cap
-        if tl > 0:
+
+        if buckets[-1] != max_bucket:
             buckets.append(max_bucket)
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
@@ -131,7 +145,7 @@ class BucketIter(mx.io.DataIter):
 
         return tuple(shape)
 
-    def __init__(self, problem, batch_size):
+    def __init__(self, problem, batch_size, max_pad_num = 5):
         super(BucketIter, self).__init__()
 
         self.problem = problem
@@ -140,7 +154,7 @@ class BucketIter(mx.io.DataIter):
         self.data_names = problem.data_names()
         self.label_names = problem.label_names()
 
-        self.buckets, self.default_bucket_key = self.gen_buckets(batch_size)
+        self.buckets, self.default_bucket_key = self.gen_buckets(batch_size, max_pad_num)
 
         self.data = [[[] for _ in range(len(self.data_names))]
                      for _ in range(len(self.buckets))]
