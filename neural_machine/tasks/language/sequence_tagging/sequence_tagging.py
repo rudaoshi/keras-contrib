@@ -2,9 +2,35 @@
 
 import numpy as np
 import mxnet as mx
+from mxnet import ndarray
+from mxnet.metric import EvalMetric, check_label_shapes
 
 from neural_machine.tasks.language.common.problem import Problem
 from neural_machine.component.lstm import StackedLSTM, BidirectionalStackedLSTM
+
+
+
+
+class MaskedAccuracy(EvalMetric):
+    """Calculate accuracy"""
+
+    def __init__(self, mask):
+        super(MaskedAccuracy, self).__init__('accuracy')
+        self.mask = mask
+
+    def update(self, labels, preds):
+        check_label_shapes(labels, preds)
+
+        for label, pred_label in zip(labels, preds):
+            pred_label = ndarray.argmax_channel(pred_label).asnumpy().astype('int32')
+            label = label.reshape((label.size,)).asnumpy().astype('int32')
+
+            check_label_shapes(label, pred_label)
+            pred_label = pred_label[label!=self.mask]
+            label = label[label!=self.mask]
+
+            self.sum_metric += (pred_label.flat == label.flat).sum()
+            self.num_inst += len(pred_label.flat)
 
 class SequenceTaggingProblem(Problem):
 
@@ -26,23 +52,7 @@ class SequenceTaggingProblem(Problem):
         for sample, label in self.corpus.corpus:
             yield [sample], [label]
 
-    @staticmethod
-    def objective(label, pred):
-        "Perplexity for language model"
 
-        #logging.debug("{0} {1}".format(label.shape, pred.shape))
-
-        label = label.T.reshape((-1,))
-        loss = 0.
-        for i in range(pred.shape[0]):
-            try:
-                loss += -np.log(max(1e-10, pred[i][int(label[i])]))
-            except:
-                print >> sys.stderr, pred
-                print >> sys.stderr, label
-                raise
-
-        return np.exp(loss / label.size)
 
 
 class ArchParam(object):
@@ -62,10 +72,15 @@ class LearnParam(object):
         self.learning_rate = learning_rate
         self.momentum = momentum
 
+import os
+# MXNET_CPU_WORKER_NTHREADS must be greater than 1 for custom op to work on CPU
+os.environ["MXNET_CPU_WORKER_NTHREADS"] = "2"
 
-class MaskedSoftmax(mx.operator.NumpyOp):
-    def __init__(self, mask):
-        super(MaskedSoftmax, self).__init__(False)
+@mx.operator.register("masked_softmax")
+class MaskedSoftmaxProp(mx.operator.CustomOpProp):
+
+    def __init__(self, mask=None):
+        super(MaskedSoftmaxProp, self).__init__(need_top_grad=False)
         self.mask = mask
 
     def list_arguments(self):
@@ -80,22 +95,32 @@ class MaskedSoftmax(mx.operator.NumpyOp):
         output_shape = in_shape[0]
         return [data_shape, label_shape], [output_shape]
 
-    def forward(self, in_data, out_data):
-        x = in_data[0]
-        y = out_data[0]
-        y[:] = np.exp(x - x.max(axis=1).reshape((x.shape[0], 1)))
+
+    def create_operator(self, ctx, shapes, dtypes):
+        return MaskedSoftmax(self.mask)
+
+class MaskedSoftmax(mx.operator.CustomOp):
+    def __init__(self, mask):
+        super(MaskedSoftmax, self).__init__()
+        self.mask = mask
+
+
+    def forward(self, is_train, req, in_data, out_data, aux):
+        x = in_data[0].asnumpy()
+        y = np.exp(x - x.max(axis=1).reshape((x.shape[0], 1)))
         y /= y.sum(axis=1).reshape((x.shape[0], 1))
+        self.assign(out_data[0], req[0], mx.nd.array(y))
 
-    def backward(self, out_grad, in_data, out_data, in_grad):
-        logging.log(logging.DEBUG, "In Data:" + " ".join([str(x.shape) for x in in_data]))
-        l = in_data[1]
-        l = l.reshape((l.size,)).astype(np.int)
-        y = out_data[0]
-        dx = in_grad[0]
-        dx[:] = y
-        dx[np.arange(l.shape[0]), l] -= 1.0
 
-        #dx[np.arange(l.shape[0]), l==self.mask] = 0.0
+    def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
+
+        #logging.log(logging.DEBUG, "MASK = " + str(self.mask))
+        l = in_data[1].asnumpy().ravel().astype(np.int)
+        y = out_data[0].asnumpy()
+        y[np.arange(l.shape[0]), l] -= 1.0
+        y[np.arange(l.shape[0]), l == self.mask] = 0.0
+
+        self.assign(in_grad[0], req[0], mx.nd.array(y))
 
 
 class PartialLabeledSenquenceTaggingModel(object):
@@ -104,6 +129,19 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.param = param
         self.mask = unlabeled_tag_id
+
+        self.init_states = RepeatedAppendIter(
+            [np.zeros((batch_size, self.param.num_hidden))] * 8,
+            ['{0}_l{1}_init_{2}'.format(direction, l, t)
+             for l in range(self.param.num_lstm_layer)
+             for t in ["c", "h"]
+             for direction in ["forward", "backward"]])
+
+        #self.init_states = RepeatedAppendIter(
+        #    [np.zeros((batch_size, self.param.num_hidden))] * 4,
+        #    ['l{0}_init_{1}'.format(l, t)
+        #     for l in range(self.param.num_lstm_layer)
+        #     for t in ["c", "h"]])
 
     def __build(self, bucket):
 
@@ -140,7 +178,9 @@ class PartialLabeledSenquenceTaggingModel(object):
         # label = mx.sym.Reshape(data=label, target_shape=(0,))
         ################################################################################
 
-        sm = MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
+        sm = mx.symbol.Custom(data=pred, label=label,  mask = self.mask, name='softmax', op_type='masked_softmax')
+
+        #sm = MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
 
         return sm
 
@@ -149,7 +189,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-        contexts = [mx.context.cpu(i) for i in range(2)]
+        contexts = [mx.context.gpu(i) for i in range(4)]
         self.model = mx.model.FeedForward(ctx=contexts,
                                           symbol=self.symbol,
                                           num_epoch=learning_param.num_epoch,
@@ -158,28 +198,29 @@ class PartialLabeledSenquenceTaggingModel(object):
                                           wd=0.00001,
                                           initializer=mx.init.Xavier(factor_type="in", magnitude=2.34))
 
-        init_states = RepeatedAppendIter(
-            [np.zeros((batch_size, self.param.num_hidden))] * 8,
-            ['{0}_l{1}_init_{2}'.format(direction, l, t)
-             for l in range(self.param.num_lstm_layer)
-             for t in ["c", "h"]
-             for direction in ["forward", "backward"]])
+        """
 
-        train_iter = MergeIter(data_train, init_states)
+        """
+
+
+
+        train_iter = MergeIter(data_train, self.init_states)
 
         val_iter = None
         if data_val:
-            val_iter = MergeIter(data_val, init_states)
+            val_iter = MergeIter(data_val, self.init_states)
 
 
         self.model.fit(X=train_iter, eval_data=val_iter,
-                  #eval_metric=mx.metric.np(SequenceTaggingProblem.objective),
+                  eval_metric=MaskedAccuracy(self.mask),
                   batch_end_callback=mx.callback.Speedometer(batch_size, 50), )
 
 
-    def show_shape_info(self, train_iter):
+    def show_shape_info(self, data_train):
 
-        default_symbol = self.symbol(train_iter.default_bucket_key)
+        train_iter = MergeIter(data_train, self.init_states)
+
+        default_symbol = self.__build(train_iter.default_bucket_key)
 
         arg_shape, output_shape, aux_shape = default_symbol.infer_shape(
             **dict(train_iter.provide_data + train_iter.provide_label)
@@ -188,10 +229,10 @@ class PartialLabeledSenquenceTaggingModel(object):
         aux_names = default_symbol.list_auxiliary_states()
 
         for i in range(len(arg_names)):
-            print arg_names[i], arg_shape[i]
+            print arg_names[i], arg_shape[i] if arg_shape is not None else "None"
 
         for i in range(len(aux_names)):
-            print aux_names[i], aux_shape[i]
+            print aux_names[i], aux_shape[i] if aux_shape is not None else "None"
 
         print "output shape", output_shape
 
@@ -242,6 +283,9 @@ if __name__ == '__main__':
 
     unlabeled_tag_id = corpus.target_corpus.id("U")
     lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
+
+
+    lm.show_shape_info(data_train)
 
     logging.log(logging.INFO, "Begin to train ...")
     lm.train(data_train, None, learning_param)

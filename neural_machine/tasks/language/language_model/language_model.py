@@ -32,7 +32,7 @@ class LanguageModelProblem(Problem):
     def objective(label, pred):
         "Perplexity for language model"
 
-        #logging.debug("{0} {1}".format(label.shape, pred.shape))
+        logging.debug("{0} {1}".format(label.shape, pred.shape))
 
         label = label.T.reshape((-1,))
         loss = 0.
