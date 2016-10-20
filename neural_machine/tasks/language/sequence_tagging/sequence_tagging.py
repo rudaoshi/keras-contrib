@@ -26,8 +26,8 @@ class MaskedAccuracy(EvalMetric):
             label = label.reshape((label.size,)).asnumpy().astype('int32')
 
             check_label_shapes(label, pred_label)
-            #pred_label = pred_label[np.logical_and(label!=self.mask, label!=0)]
-            #label = label[np.logical_and(label!=self.mask ,label!=0)]
+            pred_label = pred_label[np.logical_and(label!=self.mask, label!=0)]
+            label = label[np.logical_and(label!=self.mask ,label!=0)]
 
             self.sum_metric += (pred_label.flat == label.flat).sum()
             self.num_inst += len(pred_label.flat)
