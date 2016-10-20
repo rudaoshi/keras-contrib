@@ -114,7 +114,7 @@ class MaskedSoftmax(mx.operator.CustomOp):
     def forward(self, is_train, req, in_data, out_data, aux):
         x = in_data[0]
         y = mx.nd.exp(x - mx.nd.max(x, axis=1).reshape((x.shape[0], 1)))
-        y = y/y.sum(axis=1).reshape((x.shape[0], 1))
+        y = y/mx.nd.sum(y, axis=1).reshape((x.shape[0], 1))
         self.assign(out_data[0], req[0], y)
 
 
