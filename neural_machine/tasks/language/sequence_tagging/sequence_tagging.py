@@ -274,7 +274,7 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
     logging.basicConfig(level=logging.DEBUG, format=head)
 
     segmenter = CharacterSegmenter()
-    corpus = SequencePairCorpus(source_with_unk=True)
+    corpus = SequencePairCorpus(source_with_unk=True, same_length=True)
 
     corpus.build(codecs.open(training_data, 'r', encoding = "utf8"), segmenter, segmenter)
 
