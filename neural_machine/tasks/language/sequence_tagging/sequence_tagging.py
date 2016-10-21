@@ -112,10 +112,10 @@ class MaskedSoftmax(mx.operator.CustomOp):
 
 
     def forward(self, is_train, req, in_data, out_data, aux):
-        x = in_data[0].asnumpy()
-        y = np.exp(x - x.max(axis=1).reshape((x.shape[0], 1)))
-        y /= y.sum(axis=1).reshape((x.shape[0], 1))
-        self.assign(out_data[0], req[0], mx.nd.array(y))
+        x = in_data[0]
+        y = mx.nd.exp(x - mx.nd.max(x, axis=1).reshape((x.shape[0], 1)))
+        y = y/mx.nd.sum(y, axis=1).reshape((x.shape[0], 1))
+        self.assign(out_data[0], req[0], y)
 
 
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
@@ -221,7 +221,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         val_iter = None
         if data_val:
-            val_iter = MergeIter(data_val, self.init_states)
+            val_iter = MergeIter(data_val, init_states)
 
 
         self.model.fit(X=train_iter, eval_data=val_iter,
@@ -265,9 +265,10 @@ import click
 @click.command()
 @click.argument("training_data")
 @click.option("--batch_size", type=click.INT, default = 100)
+@click.option("--max_pad", type=click.INT, default = 5)
 @click.option("--dev", type=click.Choice(['gpu', 'cpu']), default="cpu")
 @click.option("--nworker", type=click.INT, default=2)
-def train_model(training_data, batch_size, dev, nworker):
+def train_model(training_data, batch_size, max_pad, dev, nworker):
 
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=head)
@@ -279,7 +280,7 @@ def train_model(training_data, batch_size, dev, nworker):
 
     problem = SequenceTaggingProblem(corpus)
 
-    data_train = BucketIter(problem, batch_size)
+    data_train = BucketIter(problem, batch_size, max_pad_num = max_pad)
 
 #    val_corpus = corpus.make(open(sys.argv[2], 'r'), segmenter)
 #    val_problem = LanguageModelProblem(val_corpus)
