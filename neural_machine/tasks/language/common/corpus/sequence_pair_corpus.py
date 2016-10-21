@@ -25,10 +25,15 @@ class SequencePairCorpus(object):
 
         for line in data_file:
             line = line.strip()
-            if not line or "\t" not in line:
+            if not line:
                 continue
 
-            src_seq, tgt_seq = line.split('\t')
+            try:
+                src_seq, tgt_seq = line.split('\t')
+            except:
+                logging.error("no sequence pair found in sentence : {0} ".format(json.dumps(line)))
+                continue
+
             if self.same_length and len(src_seq) != len(tgt_seq):
                 logging.error("src and tgt seq not in same length {0} {1} {2}".format(len(src_seq), len(tgt_seq), json.dumps(line)))
                 continue
