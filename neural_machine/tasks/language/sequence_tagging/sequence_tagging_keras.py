@@ -8,7 +8,7 @@ from keras.layers.wrappers import Bidirectional, TimeDistributed
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 import numpy as np
-from .sequence_tagging import SequenceTaggingProblem, LearnParam, ArchParam
+from neural_machine.tasks.language.sequence_tagging.sequence_tagging import SequenceTaggingProblem, LearnParam, ArchParam
 from neural_machine.tasks.language.common.data_reader.bucket_iter import BucketIter
 
 from neural_machine.tasks.language.common.corpus.segmentor import *
