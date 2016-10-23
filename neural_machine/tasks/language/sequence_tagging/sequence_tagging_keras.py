@@ -39,7 +39,7 @@ class SequenceTaggingMachine(object):
         self.model.add(Bidirectional(LSTM(128, return_sequences=True)))
 
         self.model.add(TimeDistributedDense(input_dim=128, output_dim=train_corpus.target_cell_num()))
-        self.model.add(Activation('time_distributed_softmax'))
+        self.model.add(Activation('softmax'))
 
         self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 
