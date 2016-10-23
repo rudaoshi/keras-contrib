@@ -160,9 +160,6 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         embed_weight = mx.sym.Variable("embed_weight")
 
-        cls_weight = mx.sym.Variable("cls_weight")
-        cls_bias = mx.sym.Variable("cls_bias")
-
         data = mx.sym.Variable('data')
         label = mx.sym.Variable('label')
 
@@ -175,8 +172,11 @@ class PartialLabeledSenquenceTaggingModel(object):
         lstm = BidirectionalStackedLSTM(self.param.num_lstm_layer,
                            self.param.num_hidden, seq_len, return_sequence=True)(wordvec)
 
-        pred = mx.sym.FullyConnected(data=lstm, num_hidden=self.param.output_cell_num,
-                                     weight=cls_weight, bias=cls_bias, name='pred')
+        fc1 = mx.symbol.FullyConnected(data=lstm, num_hidden=128)
+        act1 = mx.symbol.Activation(data=fc1, act_type="relu")
+        fc2 = mx.symbol.FullyConnected(data=act1, num_hidden=128)
+        act2 = mx.symbol.Activation(data=fc2, act_type="relu")
+        fc3 = mx.symbol.FullyConnected(data=act2, num_hidden=self.param.output_cell_num)
 
         ################################################################################
         # Make label the same shape as our produced data path
@@ -193,7 +193,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         # sm = mx.symbol.Custom(data=pred, label=label,  mask = self.mask, name='softmax', op_type='masked_softmax')
 
-        sm = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
+        sm = mx.sym.SoftmaxOutput(data=fc3, label=label, name='softmax')
 
         return sm
 
