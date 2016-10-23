@@ -41,7 +41,7 @@ class SequenceTaggingMachine(object):
         self.model.add(TimeDistributedDense(input_dim=128, output_dim=train_corpus.target_cell_num()))
         self.model.add(Activation('softmax'))
 
-        self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+        self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop',metrics=['accuracy'])
 
 
         print "Begin train model"
