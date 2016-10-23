@@ -18,8 +18,11 @@ from neural_machine.tasks.language.common.data_reader.bucket_iter import *
 
 def bucket_iter_adapter(bucket_iter):
 
-    for batch in bucket_iter:
-        yield batch.data[0].asnumpy(), batch.label[0].asnumpy()
+    while True:
+        for batch in bucket_iter:
+            yield batch.data[0].asnumpy(), batch.label[0].asnumpy()
+
+        bucket_iter.reset()
 
 
 class SequenceTaggingMachine(object):
@@ -38,7 +41,7 @@ class SequenceTaggingMachine(object):
         self.model.add(Bidirectional(LSTM(128, return_sequences=True)))
         self.model.add(Bidirectional(LSTM(128, return_sequences=True)))
 
-        self.model.add(TimeDistributedDense(input_dim=128, output_dim=train_corpus.target_cell_num()))
+        self.model.add(TimeDistributed(Dense(input_dim=128, output_dim=train_corpus.target_cell_num())))
         self.model.add(Activation('softmax'))
 
         self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop',metrics=['accuracy'])
@@ -54,7 +57,8 @@ class SequenceTaggingMachine(object):
 
         self.model.fit_generator(bucket_iter_adapter(data_train),
                                  samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=2,
-                                 validation_data=bucket_iter_adapter(data_val))
+                                 validation_data=bucket_iter_adapter(data_val),
+                                 nb_val_samples = valid_corpus.corpus_size())
 
         print "Model is trained"
 
