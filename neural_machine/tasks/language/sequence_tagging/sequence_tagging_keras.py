@@ -32,7 +32,7 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
 
     while True:
         for batch in bucket_iter:
-            yield batch.data[0].asnumpy(), to_time_distributed_categorical(batch.label[0].asnumpy(), nb_classes)
+            yield batch.data[0].asnumpy(), to_time_distributed_categorical(batch.label[0].asnumpy().astype(np.int32), nb_classes)
 
         bucket_iter.reset()
 
