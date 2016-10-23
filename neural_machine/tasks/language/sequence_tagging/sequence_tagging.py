@@ -191,12 +191,14 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-        init_states = RepeatedAppendIter(
-            [np.zeros((learning_param.batch_size, self.param.num_hidden))] * 8,
-            ['{0}_l{1}_init_{2}'.format(direction, l, t)
+	state_data_names = ['{0}_l{1}_init_{2}'.format(direction, l, t)
              for l in range(self.param.num_lstm_layer)
              for t in ["c", "h"]
-             for direction in ["forward", "backward"]])
+             for direction in ["forward", "backward"]]
+
+        init_states = RepeatedAppendIter(
+            [np.zeros((learning_param.batch_size, self.param.num_hidden))] * len(state_data_names),
+            state_data_names)
 
         if learning_param.device == "cpu":
             contexts = [mx.context.cpu(i) for i in range(learning_param.nworker)]
@@ -290,7 +292,7 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
     arch_param = ArchParam(
         num_hidden= 200,
         num_embed= 200,
-        num_lstm_layer= 2,
+        num_lstm_layer= 6,
         input_cell_num = corpus.source_cell_num(),
         output_cell_num= corpus.target_cell_num()
     )
