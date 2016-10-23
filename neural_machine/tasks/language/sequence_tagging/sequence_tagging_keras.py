@@ -16,11 +16,23 @@ from neural_machine.tasks.language.common.corpus.sequence_corpus import Sequence
 from neural_machine.tasks.language.common.corpus.sequence_pair_corpus import SequencePairCorpus
 from neural_machine.tasks.language.common.data_reader.bucket_iter import *
 
-def bucket_iter_adapter(bucket_iter):
+
+def to_time_distributed_categorical(y, nb_classes=None):
+
+    sample_size, time_steps = y.shape
+    if not nb_classes:
+        nb_classes = np.max(y)+1
+
+    Y = np.zeros((sample_size, time_steps, nb_classes))
+    Y[np.arange(y.shape[0])[:, np.newaxis], np.arange(y.shape[1]), y] = 1
+
+    return Y
+
+def bucket_iter_adapter(bucket_iter, nb_classes):
 
     while True:
         for batch in bucket_iter:
-            yield batch.data[0].asnumpy(), batch.label[0].asnumpy()
+            yield batch.data[0].asnumpy(), to_time_distributed_categorical(batch.label[0].asnumpy(), nb_classes)
 
         bucket_iter.reset()
 
@@ -55,9 +67,9 @@ class SequenceTaggingMachine(object):
         data_val = BucketIter(val_problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
 
 
-        self.model.fit_generator(bucket_iter_adapter(data_train),
+        self.model.fit_generator(bucket_iter_adapter(data_train,train_corpus.target_cell_num()),
                                  samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=2,
-                                 validation_data=bucket_iter_adapter(data_val),
+                                 validation_data=bucket_iter_adapter(data_val, train_corpus.target_cell_num()),
                                  nb_val_samples = valid_corpus.corpus_size())
 
         print "Model is trained"
