@@ -1,6 +1,7 @@
 
 
 import numpy as np
+np.set_printoptions(threshold=np.inf)
 import mxnet as mx
 from mxnet import ndarray
 from mxnet.metric import EvalMetric, check_label_shapes
@@ -26,8 +27,12 @@ class MaskedAccuracy(EvalMetric):
             label = label.reshape((label.size,)).asnumpy().astype('int32')
 
             check_label_shapes(label, pred_label)
-            pred_label = pred_label[np.logical_and(label!=self.mask, label!=0)]
-            label = label[np.logical_and(label!=self.mask ,label!=0)]
+            
+            #mask = np.logical_and(label!=self.mask, label!=0)
+            #pred_label = pred_label[mask]
+            #label = label[mask]
+
+            #logging.debug("EVAL: label = {0}, pred = {1}".format(str(label), str(pred_label)))
 
             self.sum_metric += (pred_label.flat == label.flat).sum()
             self.num_inst += len(pred_label.flat)
@@ -120,14 +125,20 @@ class MaskedSoftmax(mx.operator.CustomOp):
 
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
 
-        l = in_data[1].asnumpy().ravel().astype(np.int)
+        l = in_data[1].asnumpy().ravel().astype(np.int32)
         y = out_data[0].asnumpy()
 
         #logging.log(logging.DEBUG, "l = {0}, y = {1}".format(l.shape, y.shape))
+       # logging.debug("mask id = {0}".format(type(self.mask)))
 
-        y[np.arange(l.shape[0]), l] -= 1.0
-        y[l == self.mask, :] = 0.0
-        y[l == 0, : ] = 0.0  # padding
+        mask = np.logical_or(l==int(self.mask), l==0)
+        masked = np.where(mask)
+        valid = np.where(np.logical_not(mask))
+        y[valid, l[valid]] -= 1.0
+        y[masked, :] = 0.0
+
+        #logging.log(logging.DEBUG, "BACKPROP: l = {0}, y = {1}".format(str(l), str(y)))
+
         self.assign(in_grad[0], req[0], mx.nd.array(y))
 
 
@@ -180,9 +191,9 @@ class PartialLabeledSenquenceTaggingModel(object):
         # label = mx.sym.Reshape(data=label, target_shape=(0,))
         ################################################################################
 
-        sm = mx.symbol.Custom(data=pred, label=label,  mask = self.mask, name='softmax', op_type='masked_softmax')
+        # sm = mx.symbol.Custom(data=pred, label=label,  mask = self.mask, name='softmax', op_type='masked_softmax')
 
-        #sm = MaskedSoftmax(self.mask)(data=pred, label=label, name='softmax')
+        sm = mx.sym.SoftmaxOutput(data=pred, label=label, name='softmax')
 
         return sm
 
@@ -196,6 +207,11 @@ class PartialLabeledSenquenceTaggingModel(object):
              for t in ["c", "h"]
              for direction in ["forward", "backward"]]
 
+        #state_data_names = ['l{0}_init_{1}'.format(l, t)
+        #     for l in range(self.param.num_lstm_layer)
+        #     for t in ["c", "h"]
+        #     ]
+
         init_states = RepeatedAppendIter(
             [np.zeros((learning_param.batch_size, self.param.num_hidden))] * len(state_data_names),
             state_data_names)
@@ -208,9 +224,9 @@ class PartialLabeledSenquenceTaggingModel(object):
         self.model = mx.model.FeedForward(ctx=contexts,
                                           symbol=self.symbol,
                                           num_epoch=learning_param.num_epoch,
+                                          optimizer = 'adagrad',
                                           learning_rate=learning_param.learning_rate,
-                                          momentum=learning_param.momentum,
-                                          wd=0.00001,
+                                          wd=0.0,
                                           initializer=mx.init.Xavier(factor_type="in", magnitude=2.34))
 
         """
@@ -280,6 +296,8 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
 
     corpus.build(codecs.open(training_data, 'r', encoding = "utf8"), segmenter, segmenter)
 
+    unlabeled_tag_id = corpus.target_corpus.id("U")
+
     problem = SequenceTaggingProblem(corpus)
 
     data_train = BucketIter(problem, batch_size, max_pad_num = max_pad)
@@ -292,22 +310,25 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
     arch_param = ArchParam(
         num_hidden= 200,
         num_embed= 200,
-        num_lstm_layer= 6,
+        num_lstm_layer= 2,
         input_cell_num = corpus.source_cell_num(),
         output_cell_num= corpus.target_cell_num()
     )
 
     learning_param = LearnParam(
-        num_epoch=25,learning_rate=0.01, momentum=0.0,
+        num_epoch=25,learning_rate=0.05, momentum=0.0,
         batch_size = batch_size, device=dev, nworker = nworker
     )
 
-    unlabeled_tag_id = corpus.target_corpus.id("U")
     lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
 
 
     #lm.show_shape_info(data_train)
-
+    logging.debug("O = {0}, S = {1}, B = {2}, I = {3}, E = {4} U = {5}".format(
+        corpus.target_corpus.id("O"), corpus.target_corpus.id("S"),
+        corpus.target_corpus.id("B"), corpus.target_corpus.id("I"), corpus.target_corpus.id("E"),
+        corpus.target_corpus.id("U")))
+ 
     logging.log(logging.INFO, "Begin to train ...")
     lm.train(data_train, None, learning_param)
 
