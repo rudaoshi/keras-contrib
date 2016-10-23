@@ -282,11 +282,12 @@ import click
 
 @click.command()
 @click.argument("training_data")
+@click.argument("validating_data")
 @click.option("--batch_size", type=click.INT, default = 100)
 @click.option("--max_pad", type=click.INT, default = 5)
 @click.option("--dev", type=click.Choice(['gpu', 'cpu']), default="cpu")
 @click.option("--nworker", type=click.INT, default=2)
-def train_model(training_data, batch_size, max_pad, dev, nworker):
+def train_model(training_data, validating_data, batch_size, max_pad, dev, nworker):
 
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=head)
@@ -302,9 +303,9 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
 
     data_train = BucketIter(problem, batch_size, max_pad_num = max_pad)
 
-#    val_corpus = corpus.make(open(sys.argv[2], 'r'), segmenter)
-#    val_problem = LanguageModelProblem(val_corpus)
-#    data_val = BucketIter(val_problem, batch_size)
+    val_corpus = corpus.make(codecs.open(validating_data, 'r', encoding = "utf8"), segmenter, segmenter)
+    val_problem = SequenceTaggingProblem(val_corpus)
+    data_val = BucketIter(val_problem, batch_size, max_pad_num = max_pad)
 
 
     arch_param = ArchParam(
@@ -330,7 +331,7 @@ def train_model(training_data, batch_size, max_pad, dev, nworker):
         corpus.target_corpus.id("U")))
  
     logging.log(logging.INFO, "Begin to train ...")
-    lm.train(data_train, None, learning_param)
+    lm.train(data_train, data_val, learning_param)
 
 
 if __name__ == "__main__":

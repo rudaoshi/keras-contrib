@@ -4,6 +4,7 @@ import codecs
 import numpy as np
 
 import logging
+import copy
 
 class SequenceCorpus(object):
     def __init__(self, with_start = False, with_end = False, with_unk = False):
@@ -99,6 +100,7 @@ class SequenceCorpus(object):
         logging.info("Character num = {}".format(len(self.cell_id_map)))
         logging.info("Corpus size = {}".format(len(self.corpus)))
 
+
     def make(self, data_file, segmentor):
 
         corpus = SequenceCorpus(self.with_start, self.with_end, self.with_unk)
@@ -111,6 +113,15 @@ class SequenceCorpus(object):
             corpus.corpus.append(cur_curpus)
 
         return corpus
+
+    def clone(self):
+
+        corpus = SequenceCorpus(self.with_start, self.with_end, self.with_unk)
+        corpus.cell_id_map = copy.copy(self.cell_id_map)
+        corpus.id_cell_map = copy.copy(self.id_cell_map)
+
+        return corpus
+
 
     def id(self, cell):
         return self.cell_id_map[cell]
