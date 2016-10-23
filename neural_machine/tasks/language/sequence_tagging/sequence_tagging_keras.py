@@ -4,133 +4,102 @@ from keras.models import Sequential, Graph
 from keras.layers.core import Dense, Dropout, Activation, TimeDistributedDense, Reshape, RepeatVector, Merge
 from keras.layers.embeddings import Embedding
 from keras.layers.recurrent import LSTM, GRU
+from keras.layers.wrappers import Bidirectional, TimeDistributed
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 import numpy as np
+from .sequence_tagging import SequenceTaggingProblem, LearnParam, ArchParam
+from neural_machine.tasks.language.common.data_reader.bucket_iter import BucketIter
 
+from neural_machine.tasks.language.common.corpus.segmentor import *
+from neural_machine.tasks.language.common.corpus.sequence_corpus import SequenceCorpus
+from neural_machine.tasks.language.common.corpus.sequence_pair_corpus import SequencePairCorpus
+from neural_machine.tasks.language.common.data_reader.bucket_iter import *
 
+def bucket_iter_adapter(bucket_iter):
 
+    for batch in bucket_iter:
+        yield batch.data[0].asnumpy(), batch.label[0].asnumpy()
 
 
 class SequenceTaggingMachine(object):
 
-    def __init__(self, corpus):
+    def __init__(self):
 
-        self.corpus = corpus
         self.model = None
 
-    def build(self):
+
+    def train(self, train_corpus, valid_corpus, learning_param):
 
         self.model = Sequential()
 
-        all_term_count = self.corpus.word_num()
-        self.model.add(Embedding(all_term_count, 256, mask_zero = True))
+        self.model.add(Embedding(train_corpus.source_cell_num(), 256, mask_zero = True))
 
-        model.add(Bidirectional(LSTM(64)))
-        model.add(Dropout(0.5))
-        model.add(Dense(1, activation='sigmoid'))
+        self.model.add(Bidirectional(LSTM(128, return_sequences=True)))
+        self.model.add(Bidirectional(LSTM(128, return_sequences=True)))
 
-        # try using different optimizers and different optimizer configs
-        model.compile('adam', 'binary_crossentropy', metrics=['accuracy'])
-
-
-        self.model.add(GRU(input_dim=256, output_dim=128, return_sequences=False))
-
-        self.model.add(GRU(input_dim=128, output_dim=128, return_sequences=True))
-        self.model.add(TimeDistributedDense(input_dim=128, output_dim=self.corpus.word_num()))
+        self.model.add(TimeDistributedDense(input_dim=128, output_dim=train_corpus.target_cell_num()))
         self.model.add(Activation('time_distributed_softmax'))
 
         self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 
 
-
-    def train(self):
-
-        seq_X, seq_Y = self.corpus.get_sequence_map(categorical_output=True)
-
-        print "Sequences are made"
-
-        train_seq_num = train_test_split_ratio*seq_X.shape[0]
-        X_train = seq_X[:train_seq_num]
-        Y_train = to_time_distributed_categorical(seq_Y[:train_seq_num], character_corpus.char_num())
-
-        X_test = seq_X[train_seq_num:]
-        Y_test = to_time_distributed_categorical(seq_Y[train_seq_num:], character_corpus.char_num())
-
         print "Begin train model"
-        checkpointer = ModelCheckpoint(filepath="model.step", verbose=1, save_best_only=True)
-        model.fit(X_train, Y_train, batch_size=256, nb_epoch=100, verbose=2, validation_data=(X_test, Y_test), callbacks=[checkpointer])
+        problem = SequenceTaggingProblem(train_corpus)
+        data_train = BucketIter(problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
+
+        val_problem = SequenceTaggingProblem(valid_corpus)
+        data_val = BucketIter(val_problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
+
+
+        self.model.fit_generator(bucket_iter_adapter(data_train),
+                                 batch_size=learning_param.batch_size, nb_epoch=100, verbose=2,
+                                 validation_data=bucket_iter_adapter(data_val))
 
         print "Model is trained"
 
-        score = model.evaluate(X_test, Y_test, batch_size=512)
 
-        print "valid score = ", score
+import logging
+import codecs
 
-        return model
-
-        # "images" is a numpy float array of shape (nb_samples, nb_channels=3, width, height).
-        # "captions" is a numpy integer array of shape (nb_samples, max_caption_len)
-        # containing word index sequences representing partial captions.
-        # "next_words" is a numpy float array of shape (nb_samples, vocab_size)
-        # containing a categorical encoding (0s and 1s) of the next word in the corresponding
-        # partial caption.
-        self.model.fit([images, partial_captions], next_words, batch_size=16, nb_epoch=100)
-
-
-def train_rnn(character_corpus, seq_len, train_test_split_ratio):
-    model = Sequential()
-    model.add(Embedding(character_corpus.char_num(), 256))
-    model.add(LSTM(256, 5120, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=True))
-    model.add(Dropout(0.5))
-    model.add(TimeDistributedDense(5120, character_corpus.char_num()))
-    model.add(Activation('time_distributed_softmax'))
-
-    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
-
-    seq_X, seq_Y = character_corpus.make_sequences(seq_len)
-
-    print "Sequences are made"
-
-    train_seq_num = train_test_split_ratio*seq_X.shape[0]
-    X_train = seq_X[:train_seq_num]
-    Y_train = to_time_distributed_categorical(seq_Y[:train_seq_num], character_corpus.char_num())
-
-    X_test = seq_X[train_seq_num:]
-    Y_test = to_time_distributed_categorical(seq_Y[train_seq_num:], character_corpus.char_num())
-
-    print "Begin train model"
-    checkpointer = ModelCheckpoint(filepath="model.step", verbose=1, save_best_only=True)
-    model.fit(X_train, Y_train, batch_size=256, nb_epoch=100, verbose=2, validation_data=(X_test, Y_test), callbacks=[checkpointer])
-
-    print "Model is trained"
-
-    score = model.evaluate(X_test, Y_test, batch_size=512)
-
-    print "valid score = ", score
-
-    return model
-
-import cPickle
 import click
+
 @click.command()
-@click.argument("char_cropus_file", type=click.File(mode='rb'))
-@click.argument("model_file", type=click.File(mode='wb'))
-@click.option("--seq_len", type=click.INT, default=5)
-@click.option("--split_ratio", type=click.FLOAT, default=0.8)
-def train_char_rnn(char_cropus_file, model_file,
-                    seq_len, split_ratio):
+@click.argument("training_data")
+@click.argument("validating_data")
+@click.option("--batch_size", type=click.INT, default=100)
+@click.option("--max_pad", type=click.INT, default=5)
+def train_model(training_data, validating_data, batch_size, max_pad):
+    head = '%(asctime)-15s %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=head)
 
-    corpus = cPickle.load(char_cropus_file)
+    segmenter = CharacterSegmenter()
+    train_corpus = SequencePairCorpus(source_with_unk=True, same_length=True)
 
-    model = train_rnn(corpus, seq_len, split_ratio)
+    train_corpus.build(codecs.open(training_data, 'r', encoding="utf8"), segmenter, segmenter)
 
-    cPickle.dump(model, model_file, protocol=cPickle.HIGHEST_PROTOCOL)
+    unlabeled_tag_id = train_corpus.target_corpus.id("U")
+
+    val_corpus = train_corpus.make(codecs.open(validating_data, 'r', encoding="utf8"), segmenter, segmenter)
+
+
+    learning_param = LearnParam(
+        num_epoch=25, learning_rate=0.05, momentum=0.0,
+        batch_size=batch_size,
+        max_pad = max_pad, device=None, nworker=None
+    )
+
+
+
+    lm = SequenceTaggingMachine()
+
+
+    logging.log(logging.INFO, "Begin to train ...")
+    lm.train(train_corpus, val_corpus, learning_param)
 
 
 if __name__ == "__main__":
-
-    train_char_rnn()
+    train_model()
 
 
 

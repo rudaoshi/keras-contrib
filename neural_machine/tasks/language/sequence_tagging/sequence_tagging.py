@@ -74,12 +74,13 @@ class ArchParam(object):
 class LearnParam(object):
 
     def __init__(self, num_epoch, learning_rate, momentum,
-        batch_size, device, nworker
+        batch_size, max_pad, device, nworker
     ):
         self.num_epoch = num_epoch
         self.learning_rate = learning_rate
         self.momentum = momentum
         self.batch_size = batch_size
+        self.max_pad = max_pad
         self.device = device
         self.nworker = nworker
 
@@ -173,9 +174,9 @@ class PartialLabeledSenquenceTaggingModel(object):
                            self.param.num_hidden, seq_len, return_sequence=True)(wordvec)
 
         fc1 = mx.symbol.FullyConnected(data=lstm, num_hidden=128)
-        act1 = mx.symbol.Activation(data=fc1, act_type="relu")
+        act1 = mx.symbol.Activation(data=fc1, act_type="sigmoid")
         fc2 = mx.symbol.FullyConnected(data=act1, num_hidden=128)
-        act2 = mx.symbol.Activation(data=fc2, act_type="relu")
+        act2 = mx.symbol.Activation(data=fc2, act_type="sigmoid")
         fc3 = mx.symbol.FullyConnected(data=act2, num_hidden=self.param.output_cell_num)
 
         ################################################################################
@@ -202,7 +203,7 @@ class PartialLabeledSenquenceTaggingModel(object):
 
         self.symbol = lambda seq_len: self.__build(seq_len)
 
-	state_data_names = ['{0}_l{1}_init_{2}'.format(direction, l, t)
+        state_data_names = ['{0}_l{1}_init_{2}'.format(direction, l, t)
              for l in range(self.param.num_lstm_layer)
              for t in ["c", "h"]
              for direction in ["forward", "backward"]]
@@ -318,7 +319,8 @@ def train_model(training_data, validating_data, batch_size, max_pad, dev, nworke
 
     learning_param = LearnParam(
         num_epoch=25,learning_rate=0.05, momentum=0.0,
-        batch_size = batch_size, device=dev, nworker = nworker
+        batch_size = batch_size,
+        max_pad = max_pad, device=dev, nworker = nworker
     )
 
     lm = PartialLabeledSenquenceTaggingModel(arch_param, unlabeled_tag_id)
