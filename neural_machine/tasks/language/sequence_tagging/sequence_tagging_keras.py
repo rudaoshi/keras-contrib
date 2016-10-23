@@ -53,7 +53,7 @@ class SequenceTaggingMachine(object):
 
 
         self.model.fit_generator(bucket_iter_adapter(data_train),
-                                 batch_size=learning_param.batch_size, nb_epoch=100, verbose=2,
+                                 samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=2,
                                  validation_data=bucket_iter_adapter(data_val))
 
         print "Model is trained"
