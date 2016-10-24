@@ -35,7 +35,7 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
         #logging.debug("trying to read data")
         try:
             batch = bucket_iter.next()
-        #    logging.debug("Batch generated")
+            logging.debug("Batch generated: {0} - {1}".format(batch.data[0].shape, batch.label[0].shape))
             yield batch.data[0], to_time_distributed_categorical(batch.label[0].astype(np.int32), nb_classes)
         except StopIteration:
             bucket_iter.reset()
@@ -47,7 +47,7 @@ from theano import tensor as T, function, printing
 
 def _debug_fn(op, xin):
 
-    logging.error(str(xin))
+    #logging.error(str(xin))
     if np.isnan(xin).any():
         logging.error("Nan detected in output")
 
