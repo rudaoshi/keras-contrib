@@ -35,7 +35,6 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
         #logging.debug("trying to read data")
         try:
             batch = bucket_iter.next()
-            logging.debug("Batch generated: {0} - {1}".format(batch.data[0].shape, batch.label[0].shape))
             if batch.data[0].shape[0] > 0:
                 yield batch.data[0], to_time_distributed_categorical(batch.label[0].astype(np.int32), nb_classes)
 

@@ -269,7 +269,7 @@ class BucketIter(mx.io.DataIter):
 
         i, j = self.cursor
 
-        if j * self.batch_size >= self.data[self.shuffled_bucket_idx[i]][0].shape[0]:
+        if (j+1) * self.batch_size >= self.data[self.shuffled_bucket_idx[i]][0].shape[0]:
             i += 1
             j = 0
         else:
