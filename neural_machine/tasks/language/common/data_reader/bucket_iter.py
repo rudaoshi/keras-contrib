@@ -145,8 +145,10 @@ class BucketIter(mx.io.DataIter):
 
         return tuple(shape)
 
-    def __init__(self, problem, batch_size, max_pad_num = 5):
+    def __init__(self, problem, batch_size, max_pad_num = 5, batch_pad = False):
         super(BucketIter, self).__init__()
+
+        self.batch_pad = batch_pad
 
         self.problem = problem
         self.supervised = self.problem.is_supervised()
@@ -300,9 +302,13 @@ class BucketIter(mx.io.DataIter):
 
         else:
             cur_data = [data[j * self.batch_size:, :] for data in self.data[bucket_id]]
-            return [np.vstack((x,
+
+            if self.batch_pad:
+                return [np.vstack((x,
                              np.zeros((self.batch_size-x.shape[0],
                                        x.shape[1])))) for x in cur_data]
+            else:
+                return cur_data
 
     def getlabel(self):
         """Get label of current batch.
@@ -321,9 +327,12 @@ class BucketIter(mx.io.DataIter):
 
         else:
             cur_label = [label[j * self.batch_size:, :] for label in self.label[bucket_id]]
-            return [np.vstack((x,
+            if self.batch_pad:
+                return [np.vstack((x,
                              np.zeros((self.batch_size-x.shape[0],
                                        x.shape[1])))) for x in cur_label]
+            else:
+                return cur_label
 
     def getindex(self):
         """
