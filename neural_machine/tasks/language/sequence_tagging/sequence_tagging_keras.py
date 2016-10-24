@@ -42,15 +42,21 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
 
 from keras.backend.common import _EPSILON
 import theano.tensor as T
+from theano import tensor as T, function, printing
+
+
+def _debug_nan_fn(op, xin):
+
+    value = xin.get_value(borrow=True)
+    if np.isnan(value).any():
+        logging.error("Nan detected in output")
 
 def categorical_crossentropy(output, target):
 
-    out_checking = output.get_value(borrow=True)
 
-    if np.isnan(out_checking).any():
-        logging.error("Nan detected in output")
+    checking_output = printing.Print('hello world', global_fn= _debug_nan_fn)(output)
 
-    output = T.clip(output, _EPSILON, 1.0 - _EPSILON)
+    output = T.clip(checking_output, _EPSILON, 1.0 - _EPSILON)
 
     return T.nnet.categorical_crossentropy(output, target)
 
