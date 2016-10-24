@@ -45,7 +45,13 @@ import theano.tensor as T
 
 def categorical_crossentropy(output, target):
 
+    out_checking = output.get_value(borrow=True)
+
+    if np.isnan(out_checking).any():
+        logging.error("Nan detected in output")
+
     output = T.clip(output, _EPSILON, 1.0 - _EPSILON)
+
     return T.nnet.categorical_crossentropy(output, target)
 
 
