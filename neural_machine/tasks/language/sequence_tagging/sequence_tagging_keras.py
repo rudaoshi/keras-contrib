@@ -16,6 +16,7 @@ from neural_machine.tasks.language.common.corpus.sequence_corpus import Sequence
 from neural_machine.tasks.language.common.corpus.sequence_pair_corpus import SequencePairCorpus
 from neural_machine.tasks.language.common.data_reader.bucket_iter import *
 
+import logging
 
 def to_time_distributed_categorical(y, nb_classes=None):
 
@@ -31,10 +32,13 @@ def to_time_distributed_categorical(y, nb_classes=None):
 def bucket_iter_adapter(bucket_iter, nb_classes):
 
     while True:
-        for batch in bucket_iter:
-            yield batch.data[0].asnumpy(), to_time_distributed_categorical(batch.label[0].asnumpy().astype(np.int32), nb_classes)
-
-        bucket_iter.reset()
+        #logging.debug("trying to read data")
+        try:
+            batch = bucket_iter.next()
+        #    logging.debug("Batch generated")
+            yield batch.data[0], to_time_distributed_categorical(batch.label[0].astype(np.int32), nb_classes)
+        except StopIteration:
+            bucket_iter.reset()
 
 from keras.backend.common import _EPSILON
 import theano.tensor as T
@@ -67,16 +71,16 @@ class SequenceTaggingMachine(object):
         self.model.compile(loss=categorical_crossentropy, optimizer='rmsprop',metrics=['accuracy'])
 
 
-        print "Begin train model"
+        logging.debug("Preparing data iter")
         problem = SequenceTaggingProblem(train_corpus)
         data_train = BucketIter(problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
 
         val_problem = SequenceTaggingProblem(valid_corpus)
         data_val = BucketIter(val_problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
 
-
+	logging.debug("Begin train model")
         self.model.fit_generator(bucket_iter_adapter(data_train,train_corpus.target_cell_num()),
-                                 samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=2,
+                                 samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=1,
                                  validation_data=bucket_iter_adapter(data_val, train_corpus.target_cell_num()),
                                  nb_val_samples = valid_corpus.corpus_size())
 
@@ -101,11 +105,12 @@ def train_model(training_data, validating_data, batch_size, max_pad):
     train_corpus = SequencePairCorpus(source_with_unk=True, same_length=True)
 
     train_corpus.build(codecs.open(training_data, 'r', encoding="utf8"), segmenter, segmenter)
+    logging.debug("Train corpus built")
 
     unlabeled_tag_id = train_corpus.target_corpus.id("U")
 
     val_corpus = train_corpus.make(codecs.open(validating_data, 'r', encoding="utf8"), segmenter, segmenter)
-
+    logging.debug("Validate corpus built")
 
     learning_param = LearnParam(
         num_epoch=25, learning_rate=0.05, momentum=0.0,
