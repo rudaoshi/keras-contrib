@@ -42,8 +42,20 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
             bucket_iter.reset()
 
 from keras.backend.common import _EPSILON
-import theano.tensor as T
+import keras.backend as K
 from theano import tensor as T, function, printing
+
+
+def masked_categorical_accuracy(y_true, y_pred, mask):
+
+    y_true = K.argmax(y_true, axis=-1)
+    y_pred = K.argmax(y_pred, axis=-1)
+
+    error = K.equal(y_true, y_pred)
+
+    mask_template = T.and_(T.neq(y_true,  mask), T.neq(y_true, 0)).nonzero()
+
+    return K.mean(error[mask_template])
 
 
 def _debug_fn(op, xin):
@@ -55,7 +67,7 @@ def _debug_fn(op, xin):
     if np.isinf(xin).any():
         logging.error("Inf detected in output")
 
-def categorical_crossentropy(output, target, from_logits=False):
+def masked_categorical_crossentropy(output, target, mask, from_logits=False):
     if from_logits:
         output = T.nnet.softmax(output)
     else:
@@ -67,15 +79,18 @@ def categorical_crossentropy(output, target, from_logits=False):
     objective = -T.sum(target * T.log(output),
                        axis=output.ndim - 1)
 
+    objective = T.set_subtensor(objective[T.or_(T.eq(target[:, :, mask], 1), T.eq(target[:, :, 0], 1)).nonzero()], 0.0)
+
     return printing.Print('Objective', global_fn=_debug_fn)(objective)
 
     #return T.nnet.categorical_crossentropy(output, target)
 
 class SequenceTaggingMachine(object):
 
-    def __init__(self):
+    def __init__(self, mask ):
 
         self.model = None
+        self.mask = mask
 
 
     def train(self, train_corpus, valid_corpus, learning_param):
@@ -90,7 +105,9 @@ class SequenceTaggingMachine(object):
         self.model.add(TimeDistributed(Dense(input_dim=128, output_dim=train_corpus.target_cell_num())))
         self.model.add(Activation('softmax'))
 
-        self.model.compile(loss=categorical_crossentropy, optimizer='rmsprop',metrics=['accuracy'])
+        self.model.compile(loss=lambda output,target: masked_categorical_crossentropy(output, target, self.mask),
+                           optimizer='rmsprop',
+                           metrics=[lambda y_true, y_pred: masked_categorical_accuracy(y_true, y_pred, self.mask)])
 
 
         logging.debug("Preparing data iter")
@@ -142,7 +159,7 @@ def train_model(training_data, validating_data, batch_size, max_pad):
 
 
 
-    lm = SequenceTaggingMachine()
+    lm = SequenceTaggingMachine(unlabeled_tag_id)
 
 
     logging.log(logging.INFO, "Begin to train ...")
