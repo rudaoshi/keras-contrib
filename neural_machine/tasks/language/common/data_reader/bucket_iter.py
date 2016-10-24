@@ -34,8 +34,8 @@ class SupervisedBatch(object):
         #logging.log(logging.DEBUG, "Data:"  + " ".join([str(x.shape) for x in data ]))
         #logging.log(logging.DEBUG, "Label:" + " ".join([str(x.shape) for x in label]))
 
-        self.data = [mx.nd.array(x) for x in data]
-        self.label = [mx.nd.array(x) for x in label]
+        self.data = [x for x in data]
+        self.label = [x for x in label]
         self.data_names = data_names
         self.label_names = label_names
         self.bucket_key = bucket_key
