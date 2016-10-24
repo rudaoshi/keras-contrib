@@ -36,6 +36,14 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
 
         bucket_iter.reset()
 
+from keras.backend.common import _EPSILON
+import theano.tensor as T
+
+def categorical_crossentropy(output, target):
+
+    output = T.clip(output, _EPSILON, 1.0 - _EPSILON)
+    return T.nnet.categorical_crossentropy(output, target)
+
 
 class SequenceTaggingMachine(object):
 
@@ -56,7 +64,7 @@ class SequenceTaggingMachine(object):
         self.model.add(TimeDistributed(Dense(input_dim=128, output_dim=train_corpus.target_cell_num())))
         self.model.add(Activation('softmax'))
 
-        self.model.compile(loss='categorical_crossentropy', optimizer='rmsprop',metrics=['accuracy'])
+        self.model.compile(loss=categorical_crossentropy, optimizer='rmsprop',metrics=['accuracy'])
 
 
         print "Begin train model"
