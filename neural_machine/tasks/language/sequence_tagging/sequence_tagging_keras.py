@@ -82,7 +82,7 @@ class SequenceTaggingMachine(object):
         self.model.add(TimeDistributed(Dense(input_dim=128, output_dim=train_corpus.target_cell_num())))
         self.model.add(Activation('softmax'))
 
-        self.model.compile(loss=categorical_crossentropy, optimizer='rmsprop',metrics=['accuracy'])
+        self.model.compile(loss="categorical_crossentropy", optimizer='rmsprop',metrics=['accuracy'])
 
 
         logging.debug("Preparing data iter")
@@ -92,7 +92,7 @@ class SequenceTaggingMachine(object):
         val_problem = SequenceTaggingProblem(valid_corpus)
         data_val = BucketIter(val_problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
 
-	logging.debug("Begin train model")
+        logging.debug("Begin train model")
         self.model.fit_generator(bucket_iter_adapter(data_train,train_corpus.target_cell_num()),
                                  samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=1,
                                  validation_data=bucket_iter_adapter(data_val, train_corpus.target_cell_num()),

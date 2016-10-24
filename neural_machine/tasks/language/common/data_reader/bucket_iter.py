@@ -356,7 +356,10 @@ class BucketIter(mx.io.DataIter):
         if (j + 1) * self.batch_size < len(self.label[bucket_id]):
             return 0
         else:
-            return self.batch_size - len(self.label[bucket_id])% self.batch_size
+            if self.batch_pad:
+                return self.batch_size - len(self.label[bucket_id])% self.batch_size
+            else:
+                return 0
 
 
 class RepeatedAppendIter(mx.io.DataIter):
