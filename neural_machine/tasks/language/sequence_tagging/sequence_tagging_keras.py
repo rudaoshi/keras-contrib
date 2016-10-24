@@ -47,9 +47,9 @@ from theano import tensor as T, function, printing
 
 def _debug_nan_fn(op, xin):
 
-    value = xin.get_value(borrow=True)
-    if np.isnan(value).any():
+    if np.isnan(xin).any():
         logging.error("Nan detected in output")
+        logging.error(str(xin))
 
 def categorical_crossentropy(output, target):
 
