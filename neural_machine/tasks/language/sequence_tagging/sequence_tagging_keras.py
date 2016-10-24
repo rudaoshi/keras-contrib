@@ -54,11 +54,13 @@ def _debug_nan_fn(op, xin):
 def categorical_crossentropy(output, target):
 
 
-    checking_output = printing.Print('hello world', global_fn= _debug_nan_fn)(output)
+    output = T.clip(output, _EPSILON, 1.0 - _EPSILON)
+    checking_output = printing.Print('Softmax', global_fn= _debug_nan_fn)(output)
 
-    output = T.clip(checking_output, _EPSILON, 1.0 - _EPSILON)
+    objective = -T.sum(target * T.log(checking_output),
+                axis=checking_output.ndim - 1)
 
-    return T.nnet.categorical_crossentropy(output, target)
+    return printing.Print('Objective', global_fn= _debug_nan_fn)(objective)
 
 
 class SequenceTaggingMachine(object):
