@@ -45,23 +45,30 @@ import theano.tensor as T
 from theano import tensor as T, function, printing
 
 
-def _debug_nan_fn(op, xin):
+def _debug_fn(op, xin):
 
+    logging.error(str(xin))
     if np.isnan(xin).any():
         logging.error("Nan detected in output")
-        logging.error(str(xin))
 
-def categorical_crossentropy(output, target):
+    if np.isinf(xin).any():
+        logging.error("Inf detected in output")
 
-
+def categorical_crossentropy(output, target, from_logits=False):
+    if from_logits:
+        output = T.nnet.softmax(output)
+    else:
+        # scale preds so that the class probas of each sample sum to 1
+        output /= output.sum(axis=-1, keepdims=True)
+    # avoid numerical instability with _EPSILON clipping
     output = T.clip(output, _EPSILON, 1.0 - _EPSILON)
-    checking_output = printing.Print('Softmax', global_fn= _debug_nan_fn)(output)
 
-    objective = -T.sum(target * T.log(checking_output),
-                axis=checking_output.ndim - 1)
+    objective = -T.sum(target * T.log(output),
+                       axis=output.ndim - 1)
 
-    return printing.Print('Objective', global_fn= _debug_nan_fn)(objective)
+    return printing.Print('Objective', global_fn=_debug_fn)(objective)
 
+    #return T.nnet.categorical_crossentropy(output, target)
 
 class SequenceTaggingMachine(object):
 
@@ -82,7 +89,7 @@ class SequenceTaggingMachine(object):
         self.model.add(TimeDistributed(Dense(input_dim=128, output_dim=train_corpus.target_cell_num())))
         self.model.add(Activation('softmax'))
 
-        self.model.compile(loss="categorical_crossentropy", optimizer='rmsprop',metrics=['accuracy'])
+        self.model.compile(loss=categorical_crossentropy, optimizer='rmsprop',metrics=['accuracy'])
 
 
         logging.debug("Preparing data iter")
