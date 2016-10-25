@@ -44,7 +44,7 @@ def bucket_iter_adapter(bucket_iter, nb_classes):
 from keras.backend.common import _EPSILON
 import keras.backend as K
 from theano import tensor as T, function, printing
-
+from keras.callbacks import ModelCheckpoint
 
 def masked_categorical_accuracy(y_true, y_pred, mask):
 
@@ -117,11 +117,13 @@ class SequenceTaggingMachine(object):
         val_problem = SequenceTaggingProblem(valid_corpus)
         data_val = BucketIter(val_problem, learning_param.batch_size, max_pad_num=learning_param.max_pad)
 
+        checkpointer = ModelCheckpoint(filepath="weights.{epoch:03d}-{val_loss:.2f}.hdf5", verbose=1)
+
         logging.debug("Begin train model")
         self.model.fit_generator(bucket_iter_adapter(data_train,train_corpus.target_cell_num()),
                                  samples_per_epoch=train_corpus.corpus_size(), nb_epoch=100, verbose=1,
                                  validation_data=bucket_iter_adapter(data_val, train_corpus.target_cell_num()),
-                                 nb_val_samples = valid_corpus.corpus_size())
+                                 nb_val_samples = valid_corpus.corpus_size(), callbacks=[checkpointer])
 
         print "Model is trained"
 
