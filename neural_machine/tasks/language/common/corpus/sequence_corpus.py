@@ -7,7 +7,7 @@ import logging
 import copy
 
 class SequenceCorpus(object):
-    def __init__(self, with_start = False, with_end = False, with_unk = False):
+    def __init__(self, with_start = False, with_end = False, with_unk = False, with_pad=True):
 
         self.cell_id_map = dict()
         self.id_cell_map = dict()
@@ -18,9 +18,10 @@ class SequenceCorpus(object):
 
         self.corpus = []
 
-        # 0 is reserved for padding
-        self.cell_id_map[""] = 0
-        self.id_cell_map[0] = ""
+        if with_pad:
+            # 0 is reserved for padding
+            self.cell_id_map[""] = 0
+            self.id_cell_map[0] = ""
 
         if with_start:
             id = len(self.cell_id_map)
@@ -59,7 +60,9 @@ class SequenceCorpus(object):
         if self.with_end:
             cur_corpus = cur_corpus + [self.id("<eos>")]
 
-        self.corpus.append(cur_corpus)
+        #self.corpus.append(cur_corpus)
+
+        return cur_corpus
 
 
     def predict(self, seq, segmentor):
@@ -92,7 +95,8 @@ class SequenceCorpus(object):
 
         for line in data_file:
 
-            self.update(line, segmentor)
+            cur_corpus = self.update(line, segmentor)
+            self.corpus.append(cur_corpus)
 
 
 
