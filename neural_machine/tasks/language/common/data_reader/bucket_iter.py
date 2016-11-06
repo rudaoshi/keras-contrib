@@ -111,26 +111,22 @@ class BucketIter(mx.io.DataIter):
         head_bucket = None
         head_bucket_update = False
 
-	bucket_map = dict()
+        bucket_map = dict()
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
-            if cap + tl >= batch_size:
-                if not head_bucket:
-                    head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
+            if not head_bucket:
+                head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
+                head_bucket_update = True
+            else:
+                diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
+                if diff < 0:
+                    head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
                     head_bucket_update = True
-                else:
-                    diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
-                    if diff < 0:
-                        head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
-                        head_bucket_update = True
 
             if head_bucket_update:
                 buckets.append(tuple(head_bucket))
-                tl = 0
                 head_bucket_update = False
-            else:
-                tl += cap
-   	    
+
             bucket_map[bucket] = len(buckets) - 1
 
         if buckets[-1] != max_bucket:
