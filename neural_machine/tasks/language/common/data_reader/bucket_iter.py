@@ -114,20 +114,29 @@ class BucketIter(mx.io.DataIter):
         bucket_map = dict()
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
-            if not head_bucket:
-                head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
-                head_bucket_update = True
-            else:
-                diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
-                if diff < 0:
-                    head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
+            if cap + tl >= batch_size:
+                if not head_bucket:
+                    head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
                     head_bucket_update = True
+                else:
+                    diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
+                    if diff < 0:
+                        head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
+                        head_bucket_update = True
 
-            if head_bucket_update:
-                buckets.append(tuple(head_bucket))
-                head_bucket_update = False
+                if head_bucket_update:
+                    buckets.append(tuple(head_bucket))
 
-            bucket_map[bucket] = len(buckets) - 1
+                    head_bucket_update = False
+
+                    bucket_map[bucket] = len(buckets) - 1
+
+                tl = 0
+            else:
+                tl += cap
+
+                bucket_map[bucket] = len(buckets)
+
 
         if buckets[-1] != max_bucket:
             buckets.append(max_bucket)
@@ -168,8 +177,7 @@ class BucketIter(mx.io.DataIter):
         for n, sample in enumerate(self.problem.samples()):
 
             shape = self.sample_shape(sample)
-
-	    idx = bucket_map[shape] 
+            idx = bucket_map[shape]
 
             if self.supervised:
                 for j in range(len(self.data_names)):
@@ -180,8 +188,8 @@ class BucketIter(mx.io.DataIter):
                 for j in range(len(self.data_names)):
                     self.data[idx][j].append(sample[j])
 
-	    if n % 1000 == 0:
-                logging.debug("{0} samples imported into bucket".format(n))
+            #if n % 1000 == 0:
+            #    logging.debug("{0} samples imported into bucket".format(n))
 
                     # we just ignore the sentence it is longer than the maximum
                     # bucket size here
