@@ -124,14 +124,19 @@ class BucketIter(mx.io.DataIter):
                         head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
                         head_bucket_update = True
 
+
+                tl = 0
+
                 if head_bucket_update:
                     buckets.append(tuple(head_bucket))
 
                     head_bucket_update = False
 
                     bucket_map[bucket] = len(buckets) - 1
+                else:
 
-                tl = 0
+                    bucket_map[bucket] = len(buckets)
+
             else:
                 tl += cap
 
