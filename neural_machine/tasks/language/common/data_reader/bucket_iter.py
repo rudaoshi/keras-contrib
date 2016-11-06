@@ -110,6 +110,8 @@ class BucketIter(mx.io.DataIter):
         buckets = []
         head_bucket = None
         head_bucket_update = False
+
+	bucket_map = dict()
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
             if cap + tl >= batch_size:
@@ -128,13 +130,15 @@ class BucketIter(mx.io.DataIter):
                 head_bucket_update = False
             else:
                 tl += cap
+   	    
+            bucket_map[bucket] = len(buckets) - 1
 
         if buckets[-1] != max_bucket:
             buckets.append(max_bucket)
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
-        return buckets, max_bucket
+        return buckets, max_bucket, bucket_map
 
     def sample_shape(self, sample):
 
@@ -156,7 +160,7 @@ class BucketIter(mx.io.DataIter):
         self.data_names = problem.data_names()
         self.label_names = problem.label_names()
 
-        self.buckets, self.default_bucket_key = self.gen_buckets(batch_size, max_pad_num)
+        self.buckets, self.default_bucket_key, bucket_map = self.gen_buckets(batch_size, max_pad_num)
 
         self.data = [[[] for _ in range(len(self.data_names))]
                      for _ in range(len(self.buckets))]
@@ -165,24 +169,24 @@ class BucketIter(mx.io.DataIter):
             self.label = [[[] for _ in range(len(self.data_names))]
                           for _ in range(len(self.buckets))]
 
-        for sample in self.problem.samples():
+        for n, sample in enumerate(self.problem.samples()):
 
             shape = self.sample_shape(sample)
 
-            for i, bkt in enumerate(self.buckets):
-                if np.all(np.array(bkt) >= np.array(shape)):
+	    idx = bucket_map[shape] 
 
-                    if self.supervised:
-                        for j in range(len(self.data_names)):
-                            self.data[i][j].append(sample[0][j])
-                        for j in range(len(self.label_names)):
-                            self.label[i][j].append(sample[1][j])
-                    else:
-                        for j in range(len(self.data_names)):
-                            self.data[i][j].append(sample[j])
-                    #logging.debug("bkt:{0}, shape:{1}".format(bkt, shape))
+            if self.supervised:
+                for j in range(len(self.data_names)):
+                    self.data[idx][j].append(sample[0][j])
+                for j in range(len(self.label_names)):
+                    self.label[idx][j].append(sample[1][j])
+            else:
+                for j in range(len(self.data_names)):
+                    self.data[idx][j].append(sample[j])
 
-                    break
+	    if n % 1000 == 0:
+                logging.debug("{0} samples imported into bucket".format(n))
+
                     # we just ignore the sentence it is longer than the maximum
                     # bucket size here
 
