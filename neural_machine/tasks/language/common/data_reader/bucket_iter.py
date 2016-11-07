@@ -194,31 +194,47 @@ class BucketIter(DataIter):
         buckets = []
         head_bucket = None
         head_bucket_update = False
+
+        cur_max_bucket = [0] * len(max_bucket)
+        bucket_map = dict()
         for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
+            cur_max_bucket = [max(cur_max_bucket[i], bucket[i]) for i in range(len(bucket))]
             if cap + tl >= batch_size:
                 if not head_bucket:
-                    head_bucket = [min(max_bucket[i],bucket[i] + max_pad_num) for i in range(len(bucket))]
+                    head_bucket = [min(max_bucket[i], cur_max_bucket[i] + max_pad_num) for i in range(len(bucket))]
                     head_bucket_update = True
                 else:
-                    diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
+                    diff = min([head_bucket[i] - cur_max_bucket[i] for i in range(len(bucket))])
                     if diff < 0:
-                        head_bucket = [min(max_bucket[i], bucket[i] + max_pad_num) for i in range(len(bucket))]
+                        head_bucket = [min(max_bucket[i], cur_max_bucket[i] + max_pad_num) for i in range(len(bucket))]
                         head_bucket_update = True
 
-            if head_bucket_update:
-                buckets.append(tuple(head_bucket))
+
                 tl = 0
-                head_bucket_update = False
+
+                if head_bucket_update:
+                    buckets.append(tuple(head_bucket))
+
+                    head_bucket_update = False
+
+                    bucket_map[bucket] = len(buckets) - 1
+                else:
+
+                    bucket_map[bucket] = len(buckets)
+
             else:
                 tl += cap
+
+                bucket_map[bucket] = len(buckets)
+
 
         if buckets[-1] != max_bucket:
             buckets.append(max_bucket)
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
-        return buckets, max_bucket
+        return buckets, max_bucket, bucket_map
 
     def sample_shape(self, sample):
 
@@ -240,7 +256,7 @@ class BucketIter(DataIter):
         self.data_names = problem.data_names()
         self.label_names = problem.label_names()
 
-        self.buckets, self.default_bucket_key = self.gen_buckets(batch_size, max_pad_num)
+        self.buckets, self.default_bucket_key, bucket_map = self.gen_buckets(batch_size, max_pad_num)
 
         self.data = [[[] for _ in range(len(self.data_names))]
                      for _ in range(len(self.buckets))]
@@ -249,24 +265,23 @@ class BucketIter(DataIter):
             self.label = [[[] for _ in range(len(self.data_names))]
                           for _ in range(len(self.buckets))]
 
-        for sample in self.problem.samples():
+        for n, sample in enumerate(self.problem.samples()):
 
             shape = self.sample_shape(sample)
+            idx = bucket_map[shape]
 
-            for i, bkt in enumerate(self.buckets):
-                if np.all(np.array(bkt) >= np.array(shape)):
+            if self.supervised:
+                for j in range(len(self.data_names)):
+                    self.data[idx][j].append(sample[0][j])
+                for j in range(len(self.label_names)):
+                    self.label[idx][j].append(sample[1][j])
+            else:
+                for j in range(len(self.data_names)):
+                    self.data[idx][j].append(sample[j])
 
-                    if self.supervised:
-                        for j in range(len(self.data_names)):
-                            self.data[i][j].append(sample[0][j])
-                        for j in range(len(self.label_names)):
-                            self.label[i][j].append(sample[1][j])
-                    else:
-                        for j in range(len(self.data_names)):
-                            self.data[i][j].append(sample[j])
-                    #logging.debug("bkt:{0}, shape:{1}".format(bkt, shape))
+            #if n % 1000 == 0:
+            #    logging.debug("{0} samples imported into bucket".format(n))
 
-                    break
                     # we just ignore the sentence it is longer than the maximum
                     # bucket size here
 
