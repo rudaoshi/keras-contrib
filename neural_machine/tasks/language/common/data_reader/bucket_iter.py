@@ -1,5 +1,5 @@
 import numpy as np
-import mxnet as mx
+
 
 
 # The interface of a data iter that works for bucketing
@@ -20,7 +20,7 @@ class UnsupervisedBatch(object):
     """Batch used for model parallelism"""
 
     def __init__(self, data, data_names, pad, index, bucket_key):
-        self.data = [mx.nd.array(x) for x in data]
+        self.data = [x for x in data]
         self.data_names = data_names
         self.bucket_key = bucket_key
         self.pad = pad
@@ -53,7 +53,91 @@ class SupervisedBatch(object):
                 for i in range(len(self.label_names))]
 
 
-class DummyIter(mx.io.DataIter):
+class DataIter(object):
+    """DataIter object in mxnet. """
+
+    def __init__(self):
+        self.batch_size = 0
+
+    def __iter__(self):
+        return self
+
+    def reset(self):
+        """Reset the iterator. """
+        pass
+
+    def next(self):
+        """Get next data batch from iterator. Equivalent to
+        self.iter_next()
+        DataBatch(self.getdata(), self.getlabel(), self.getpad(), None)
+
+        Returns
+        -------
+        data : DataBatch
+            The data of next batch.
+        """
+        if self.iter_next():
+            return DataBatch(data=self.getdata(), label=self.getlabel(), \
+                    pad=self.getpad(), index=self.getindex())
+        else:
+            raise StopIteration
+
+    def __next__(self):
+        return self.next()
+
+    def iter_next(self):
+        """Iterate to next batch.
+
+        Returns
+        -------
+        has_next : boolean
+            Whether the move is successful.
+        """
+        pass
+
+    def getdata(self):
+        """Get data of current batch.
+
+        Returns
+        -------
+        data : NDArray
+            The data of current batch.
+        """
+        pass
+
+    def getlabel(self):
+        """Get label of current batch.
+
+        Returns
+        -------
+        label : NDArray
+            The label of current batch.
+        """
+        pass
+
+    def getindex(self):
+        """Get index of the current batch.
+
+        Returns
+        -------
+        index : numpy.array
+            The index of current batch
+        """
+        return None
+
+    def getpad(self):
+        """Get the number of padding examples in current batch.
+
+        Returns
+        -------
+        pad : int
+            Number of padding examples in current batch
+        """
+        pass
+
+
+
+class DummyIter(DataIter):
     "A dummy iterator that always return the same batch, used for speed testing"
 
     def __init__(self, real_iter):
@@ -92,7 +176,7 @@ def pad(l, bucket_size):
     return data
 
 import logging
-class BucketIter(mx.io.DataIter):
+class BucketIter(DataIter):
 
 
     def gen_buckets(self, batch_size, max_pad_num):
@@ -362,7 +446,7 @@ class BucketIter(mx.io.DataIter):
                 return 0
 
 
-class RepeatedAppendIter(mx.io.DataIter):
+class RepeatedAppendIter(DataIter):
 
     def __init__(self, data, data_names):
         super(RepeatedAppendIter, self).__init__()
@@ -442,7 +526,7 @@ class RepeatedAppendIter(mx.io.DataIter):
         return 0
 
 
-class MergeIter(mx.io.DataIter):
+class MergeIter(DataIter):
 
     def __init__(self, base_iter, * appending_iter):
         super(MergeIter, self).__init__()
