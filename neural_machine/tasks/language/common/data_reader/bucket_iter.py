@@ -160,8 +160,19 @@ class DummyIter(DataIter):
     def next(self):
         return self.the_batch
 
+class DataBatch(object):
+    """Default object for holding a mini-batch of data and related information."""
+    def __init__(self, data, label, pad=None, index=None,
+                 bucket_key=None, provide_data=None, provide_label=None):
+        self.data = data
+        self.label = label
+        self.pad = pad
+        self.index = index
 
-from mxnet.io import DataBatch
+        # the following properties are only used when bucketing is used
+        self.bucket_key = bucket_key
+        self.provide_data = provide_data
+        self.provide_label = provide_label
 
 def pad(l, bucket_size):
 
