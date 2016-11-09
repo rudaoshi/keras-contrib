@@ -146,7 +146,7 @@ def train_model(training_data, validating_data, batch_size, max_pad):
     train_corpus = SequencePairCorpus(source_with_unk=True, same_length=True)
 
     train_corpus.build(codecs.open(training_data, 'r', encoding="utf8"), segmenter, segmenter)
-    logging.debug("Train corpus built")
+    logging.debug("Train corpus built : " + str(train_corpus.corpus_size()))
 
     unlabeled_tag_id = train_corpus.target_corpus.id("U")
 

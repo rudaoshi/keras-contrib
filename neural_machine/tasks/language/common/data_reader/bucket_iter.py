@@ -195,11 +195,9 @@ class BucketIter(DataIter):
 
         for sample in self.problem.samples():
             shape = self.sample_shape(sample)
-
             shape_cap_map[shape] += 1
 
         bucket_capacity = sorted(shape_cap_map.iteritems(), key=lambda x: sum(np.array(x[0])))
-
         max_bucket = tuple(np.max(np.array(shape_cap_map.keys()),axis=0))
         tl = 0
         buckets = []
@@ -232,16 +230,17 @@ class BucketIter(DataIter):
                     bucket_map[bucket] = len(buckets) - 1
                 else:
 
-                    bucket_map[bucket] = len(buckets)
+                    bucket_map[bucket] = len(buckets) - 1 
 
             else:
                 tl += cap
 
-                bucket_map[bucket] = len(buckets)
+                bucket_map[bucket] = len(buckets) 
 
 
-        if buckets[-1] != max_bucket:
-            buckets.append(max_bucket)
+        
+        buckets.append(max_bucket)
+        bucket_map[max_bucket] = len(buckets) - 1
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
@@ -266,7 +265,6 @@ class BucketIter(DataIter):
 
         self.data_names = problem.data_names()
         self.label_names = problem.label_names()
-
         self.buckets, self.default_bucket_key, bucket_map = self.gen_buckets(batch_size, max_pad_num)
 
         self.data = [[[] for _ in range(len(self.data_names))]
