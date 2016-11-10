@@ -47,12 +47,11 @@ class SequencePairCorpus(object):
                 logging.error("src and tgt seq not in same length {0} {1} {2}".format(len(src_seq), len(tgt_seq), json.dumps(line)))
                 continue
 
-            self.source_corpus.update(src_seq, source_segmenter)
-            self.target_corpus.update(tgt_seq, target_segmenter)
+            src=self.source_corpus.update(src_seq, source_segmenter)
+            target=self.target_corpus.update(tgt_seq, target_segmenter)
 
-        for src, target in itertools.izip(self.source_corpus.corpus, self.target_corpus.corpus):
             self.corpus.append((src, target))
-
+    
     def make(self, data_file, source_segmenter, target_segmenter):
 
         corpus = SequencePairCorpus(
