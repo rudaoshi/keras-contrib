@@ -221,6 +221,7 @@ class BucketIter(DataIter):
             diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
             if diff >= 0:
                 bucket_map[bucket] = len(buckets) - 1
+                i += 1
             else:
 
                 next_check_point = min(i+batch_size-1, len(bucket_capacity)-1)
