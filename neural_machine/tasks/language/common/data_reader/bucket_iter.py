@@ -212,25 +212,27 @@ class BucketIter(DataIter):
 
         for shape, cap in shape_cap_map.iteritems():
 
-            target_bucket = tuple([shape[i] if shape[i]%max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num
-                                   for i in range(len(shape))])
+            target_bucket = [0] * len(shape)
+            for i in range(len(shape)):
+                target_bucket[i] = shape[i] if shape[i] % max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num
+                target_bucket[i] = min(target_bucket[i], max_bucket[i])
+
+
             bucket_shape_map[target_bucket].add(shape)
             bucket_cap_map[target_bucket] += cap
 
-        while True:
+        while True: # merge compatable shapes
 
             minor_buckets = [bucket for bucket, cap in bucket_cap_map.iteritems() if cap < batch_size]
             update = False
             for minor_bucket in minor_buckets:
 
-                if bucket_cap_map[minor_bucket] >= batch_size:
+                if minor_bucket not in bucket_cap_map or bucket_cap_map[minor_bucket] >= batch_size:
                     continue
 
                 neighbors = sorted([x for x in bucket_cap_map.keys() if bucket_contains(x, minor_bucket) and x != minor_bucket],
                                    key=lambda x: bucket_distance(x, minor_bucket))
                 if neighbors:
-
-                    logging.info("{0} with {1} sample been merged.".format(minor_bucket, bucket_cap_map[minor_bucket]))
 
                     merge_target = neighbors[0]
                     bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
@@ -241,24 +243,39 @@ class BucketIter(DataIter):
 
                     update = True
 
+                else:
+
+                    neighbors = sorted([x for x in minor_buckets if x != minor_bucket and x in bucket_cap_map and bucket_cap_map[x] < batch_size],
+                                       key=lambda x: abs(bucket_distance(x, minor_bucket)))
+
+                    if neighbors:
+                        merge_target = tuple([max(neighbors[0][i], minor_bucket[i]) for x in range(len(minor_bucket))])
+
+                        bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
+                        del bucket_cap_map[minor_bucket]
+                        bucket_cap_map[merge_target] += bucket_cap_map[neighbors[0]]
+                        del bucket_cap_map[neighbors[0]]
+
+                        bucket_shape_map[merge_target].update(bucket_shape_map[minor_bucket])
+                        del bucket_shape_map[minor_bucket]
+                        bucket_shape_map[merge_target].update(bucket_shape_map[neighbors[0]])
+                        del bucket_shape_map[neighbors[0]]
+
+                        update = True
+
+
             if not update:
 
-                logging.info("No merge can be found")
-
-                if minor_buckets:
-                    cur_max_bucket = tuple(np.max(np.array(minor_buckets), axis=0))
-                    total_num = 0
-                    for minor_bucket in minor_buckets:
-                        total_num += bucket_cap_map[minor_bucket]
-                        bucket_cap_map[cur_max_bucket] += bucket_cap_map[minor_bucket]
-                        del bucket_cap_map[minor_bucket]
-
-                        bucket_shape_map[cur_max_bucket].update(bucket_shape_map[minor_bucket])
-                        del bucket_shape_map[minor_bucket]
-
-                    logging.info("{0} sample been merged to biggest bucket {1}.".format(total_num, cur_max_bucket))
-
                 break
+
+        minor_buckets = [bucket for bucket, cap in bucket_cap_map.iteritems() if cap < batch_size]
+
+        assert len(minor_buckets) <= 1
+
+        if minor_buckets:
+
+            logging.info("bucket {0} is left without merge with size {1}.".format( minor_buckets[0], bucket_cap_map[minor_buckets[0]]))
+
 
         buckets = bucket_shape_map.keys()
         bucket_id_map = dict((x, id) for id, x in enumerate(buckets))
@@ -274,7 +291,7 @@ class BucketIter(DataIter):
             target_bucket_id = shape_bucket_id_map[shape]
             target_bucket = buckets[target_bucket_id]
 
-            assert min([target_bucket[j] - shape[j] for j in range(len(shape))]) > 0
+            assert min([target_bucket[j] - shape[j] for j in range(len(shape))]) >= 0
 
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
