@@ -227,14 +227,14 @@ class BucketIter(DataIter):
                 total_cap = 0
                 for check_point in range(i, len(bucket_capacity)):
                     temp_bucket, temp_cap = bucket_capacity[check_point]
-                    cur_max_bucket = [max(cur_max_bucket[k], temp_bucket[k]) for k in range(len(temp_bucket))]
+                    cur_max_bucket = [max(cur_max_bucket[k], temp_bucket[k]) for k in range(len(bucket))]
                     total_cap += temp_cap
 
                     if total_cap >= batch_size:
 
                         break
 
-                head_bucket = [cur_max_bucket[k] + max_pad_num for k in range(len(cur_max_bucket))]
+                head_bucket = [cur_max_bucket[k] + max_pad_num for k in range(len(bucket))]
                 buckets.append(tuple(head_bucket))
 
                 for k in range(i, check_point + 1):
@@ -243,6 +243,8 @@ class BucketIter(DataIter):
 
 
                 i = check_point + 1
+
+            print bucket, "->", buckets[bucket_map[bucket]]
 
         for bucket, cap in bucket_capacity:
 
