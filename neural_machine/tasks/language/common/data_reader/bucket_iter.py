@@ -204,7 +204,7 @@ class BucketIter(DataIter):
         head_bucket = None
         head_bucket_update = False
 
-        cur_max_bucket = [0] * len(max_bucket)
+
         bucket_map = dict()
 
         i = 0
@@ -223,7 +223,7 @@ class BucketIter(DataIter):
                 bucket_map[bucket] = len(buckets) - 1
                 i += 1
             else:
-                cur_max_bucket = [0] * len(max_bucket)
+                cur_max_bucket = [0] * len(bucket)
                 total_cap = 0
                 for check_point in range(i, len(bucket_capacity)):
                     temp_bucket, temp_cap = bucket_capacity[check_point]
@@ -240,6 +240,8 @@ class BucketIter(DataIter):
                 for k in range(i, check_point + 1):
                     temp_bucket, _ = bucket_capacity[k]
                     bucket_map[temp_bucket] = len(buckets) - 1
+
+                    assert min([head_bucket[j] - temp_bucket[j] for j in range(len(bucket))]) > 0
 
                 i = check_point + 1
 
