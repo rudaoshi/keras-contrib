@@ -212,7 +212,8 @@ class BucketIter(DataIter):
 
         for shape, cap in shape_cap_map.iteritems():
 
-            target_bucket = tuple([shape[i] if shape[i]%max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num for i in len(shape)])
+            target_bucket = tuple([shape[i] if shape[i]%max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num
+                                   for i in range(len(shape))])
             bucket_shape_map[target_bucket].add(shape)
             bucket_cap_map[target_bucket] += cap
 
