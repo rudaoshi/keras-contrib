@@ -33,7 +33,15 @@ class CellDict(object):
             self.cell_id_map["<unk>"] = id
             self.id_cell_map[id] = "<unk>"
 
+    def iter_ids(self):
 
+        for id in self.id_cell_map:
+            yield id
+
+    def iter_cell(self):
+
+        for cell in self.cell_id_map:
+            yield cell
 
     def id(self, cell):
         return self.cell_id_map[cell]

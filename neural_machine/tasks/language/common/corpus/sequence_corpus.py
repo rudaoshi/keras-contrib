@@ -63,6 +63,14 @@ class SequenceCorpus(object):
 
         return copy.deepcopy(self)
 
+    def iter_ids(self):
+
+        return self.cell_dict.iter_ids()
+
+
+    def iter_cell(self):
+
+        return self.cell_dict.iter_cell()
 
     def id(self, cell):
         return self.cell_dict.id(cell)
