@@ -179,7 +179,7 @@ def pad(l, bucket_size):
     data = []
 
     for j in range(len(bucket_size)):
-        np_array = np.zeros((len(l[j]), bucket_size[j]))
+        np_array = np.zeros((len(l[j]), max(bucket_size[j],1)))
         for i in range(len(l[j])):
             np_array[i, :len(l[j][i])] = l[j][i]
 
