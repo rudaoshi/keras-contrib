@@ -241,9 +241,16 @@ class BucketIter(DataIter):
                     temp_bucket, _ = bucket_capacity[k]
                     bucket_map[temp_bucket] = len(buckets) - 1
 
-                    assert min([head_bucket[j] - temp_bucket[j] for j in range(len(bucket))]) > 0
 
                 i = check_point + 1
+
+        for bucket, cap in bucket_capacity:
+
+            target_bucket_id = bucket_map[bucket]
+            target_bucket = buckets[target_bucket_id]
+
+            assert min([target_bucket[j] - bucket[j] for j in range(len(bucket))]) > 0
+
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
