@@ -222,6 +222,9 @@ class BucketIter(DataIter):
             update = False
             for minor_bucket in minor_buckets:
 
+                if bucket_cap_map[minor_bucket] > batch_size:
+                    continue
+
                 neighbors = sorted([x for x in bucket_cap_map.keys() if bucket_contains(x, minor_bucket)], key=lambda x: bucket_distance(x, minor_bucket))
                 if neighbors:
                     merge_target = neighbors[0]
