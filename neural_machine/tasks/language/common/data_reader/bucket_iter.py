@@ -215,10 +215,10 @@ class BucketIter(DataIter):
 
             if not head_bucket:
                 assert len(buckets) == 0
-                head_bucket = [bucket[i] + max_pad_num for i in range(len(bucket))]
+                head_bucket = [bucket[j] + max_pad_num for j in range(len(bucket))]
                 buckets.append(tuple(head_bucket))
 
-            diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
+            diff = min([head_bucket[j] - bucket[j] for j in range(len(bucket))])
             if diff >= 0:
                 bucket_map[bucket] = len(buckets) - 1
                 i += 1
