@@ -228,6 +228,9 @@ class BucketIter(DataIter):
 
                 neighbors = sorted([x for x in bucket_cap_map.keys() if bucket_contains(x, minor_bucket)], key=lambda x: bucket_distance(x, minor_bucket))
                 if neighbors:
+
+                    logging.info("{0} with {1} sample been merged.".format(minor_bucket, bucket_cap_map[minor_bucket]))
+
                     merge_target = neighbors[0]
                     bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
                     del bucket_cap_map[minor_bucket]
@@ -237,6 +240,7 @@ class BucketIter(DataIter):
 
                     update = True
 
+            logging.info("No merge can be found")
             if not update:
                 if minor_buckets:
                     cur_max_bucket = tuple(np.max(np.array(minor_buckets), axis=0))
