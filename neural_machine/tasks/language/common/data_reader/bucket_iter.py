@@ -219,7 +219,7 @@ class BucketIter(DataIter):
 
         while True:
 
-            minor_buckets = [bucket for bucket, cap in bucket_cap_map if cap < batch_size]
+            minor_buckets = [bucket for bucket, cap in bucket_cap_map.iteritems() if cap < batch_size]
             update = False
             for minor_bucket in minor_buckets:
 
@@ -261,7 +261,7 @@ class BucketIter(DataIter):
 
         for shape in shape_cap_map:
 
-            target_bucket_id = shape_bucket_map[bucket]
+            target_bucket_id = shape_bucket_map[shape]
             target_bucket = buckets[target_bucket_id]
 
             assert min([target_bucket[j] - shape[j] for j in range(len(shape))]) > 0
