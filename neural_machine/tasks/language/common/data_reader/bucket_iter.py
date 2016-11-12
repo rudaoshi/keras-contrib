@@ -186,7 +186,14 @@ def pad(l, bucket_size):
         data.append(np_array)
     return data
 
+def bucket_contains(bucket_a, bucket_b):
+    return min([bucket_a[j] - bucket_b[j] for j in range(len(bucket_b))]) >= 0
+
+def bucket_distance(bucket_a, bucket_b):
+    return sum([bucket_a[j] - bucket_b[j] for j in range(len(bucket_b))])
+
 import logging
+from collections import defaultdict
 class BucketIter(DataIter):
 
 
@@ -197,66 +204,68 @@ class BucketIter(DataIter):
             shape = self.sample_shape(sample)
             shape_cap_map[shape] += 1
 
-        bucket_capacity = sorted(shape_cap_map.iteritems(), key=lambda x: sum(x[0]))
+        #shape_capacity = sorted(shape_cap_map.iteritems(), key=lambda x: sum(x[0]))
         max_bucket = tuple(np.max(np.array(shape_cap_map.keys()),axis=0))
-        tl = 0
-        buckets = []
-        head_bucket = None
-        head_bucket_update = False
 
+        bucket_shape_map = defaultdict(set)
+        bucket_cap_map = Counter()
 
-        bucket_map = dict()
+        for shape, cap in shape_cap_map.iteritems():
 
-        i = 0
-        while i < len(bucket_capacity):
+            target_bucket = tuple([shape[i] if shape[i]%max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num for i in len(shape)])
+            bucket_shape_map[target_bucket].add(shape)
+            bucket_cap_map[target_bucket] += cap
 
-            bucket, cap = bucket_capacity[i]
-            #cur_max_bucket = [max(cur_max_bucket[i], bucket[i]) for i in range(len(bucket))]
+        while True:
 
-            if not head_bucket:
-                assert len(buckets) == 0
-                head_bucket = [bucket[j] + max_pad_num for j in range(len(bucket))]
-                buckets.append(tuple(head_bucket))
+            minor_buckets = [bucket for bucket, cap in bucket_cap_map if cap < batch_size]
+            update = False
+            for minor_bucket in minor_buckets:
 
-            diff = min([head_bucket[j] - bucket[j] for j in range(len(bucket))])
-            if diff >= 0:
-                bucket_map[bucket] = len(buckets) - 1
-                i += 1
-            else:
-                cur_max_bucket = [0] * len(bucket)
-                total_cap = 0
-                for check_point in range(i, len(bucket_capacity)):
-                    temp_bucket, temp_cap = bucket_capacity[check_point]
-                    cur_max_bucket = [max(cur_max_bucket[k], temp_bucket[k]) for k in range(len(bucket))]
-                    total_cap += temp_cap
+                neighbors = sorted([x for x in bucket_cap_map.keys() if bucket_contains(x, minor_bucket)], key=lambda x: bucket_distance(x, minor_bucket))
+                if neighbors:
+                    merge_target = neighbors[0]
+                    bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
+                    del bucket_cap_map[minor_bucket]
 
-                    if total_cap >= batch_size:
+                    bucket_shape_map[merge_target].update(bucket_shape_map[minor_bucket])
+                    del bucket_shape_map[minor_bucket]
 
-                        break
+                    update = True
 
-                head_bucket = [cur_max_bucket[k] + max_pad_num for k in range(len(bucket))]
-                buckets.append(tuple(head_bucket))
+            if not update:
+                if minor_buckets:
+                    cur_max_bucket = tuple(np.max(np.array(minor_buckets), axis=0))
+                    for minor_bucket in minor_buckets:
+                        merge_target = cur_max_bucket
+                        bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
+                        del bucket_cap_map[minor_bucket]
 
-                for k in range(i, check_point + 1):
-                    temp_bucket, _ = bucket_capacity[k]
-                    bucket_map[temp_bucket] = len(buckets) - 1
+                        bucket_shape_map[merge_target].update(bucket_shape_map[minor_bucket])
+                        del bucket_shape_map[minor_bucket]
 
+                break
 
-                i = check_point + 1
+        buckets = bucket_shape_map.keys()
+        bucket_id_map = dict((x, id) for id, x in enumerate(buckets))
 
-            print bucket, "->", buckets[bucket_map[bucket]]
+        shape_bucket_map = dict()
+        for bucket, shapes in bucket_shape_map.iteritems():
 
-        for bucket, cap in bucket_capacity:
+            for shape in shapes:
+                shape_bucket_map[shape] = bucket_id_map[bucket]
 
-            target_bucket_id = bucket_map[bucket]
+        for shape in shape_cap_map:
+
+            target_bucket_id = shape_bucket_map[bucket]
             target_bucket = buckets[target_bucket_id]
 
-            assert min([target_bucket[j] - bucket[j] for j in range(len(bucket))]) > 0
+            assert min([target_bucket[j] - shape[j] for j in range(len(shape))]) > 0
 
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
-        return buckets, max_bucket, bucket_map
+        return buckets, max_bucket, shape_bucket_map
 
     def sample_shape(self, sample):
 
