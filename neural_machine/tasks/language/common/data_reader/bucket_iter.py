@@ -190,7 +190,7 @@ def bucket_contains(bucket_a, bucket_b):
     return min([bucket_a[j] - bucket_b[j] for j in range(len(bucket_b))]) >= 0
 
 def bucket_distance(bucket_a, bucket_b):
-    return sum([bucket_a[j] - bucket_b[j] for j in range(len(bucket_b))])
+    return sum([abs(bucket_a[j] - bucket_b[j]) for j in range(len(bucket_b))])
 
 import logging
 from collections import defaultdict
@@ -217,13 +217,14 @@ class BucketIter(DataIter):
                 target_bucket[i] = shape[i] if shape[i] % max_pad_num == 0 else (shape[i]/max_pad_num + 1) * max_pad_num
                 target_bucket[i] = min(target_bucket[i], max_bucket[i])
 
-
+            target_bucket = tuple(target_bucket)
             bucket_shape_map[target_bucket].add(shape)
             bucket_cap_map[target_bucket] += cap
 
         while True: # merge compatable shapes
 
             minor_buckets = [bucket for bucket, cap in bucket_cap_map.iteritems() if cap < batch_size]
+            minor_buckets.sort(key=lambda x: sum(x))
             update = False
             for minor_bucket in minor_buckets:
 
@@ -246,10 +247,10 @@ class BucketIter(DataIter):
                 else:
 
                     neighbors = sorted([x for x in minor_buckets if x != minor_bucket and x in bucket_cap_map and bucket_cap_map[x] < batch_size],
-                                       key=lambda x: abs(bucket_distance(x, minor_bucket)))
+                                       key=lambda x: bucket_distance(x, minor_bucket))
 
                     if neighbors:
-                        merge_target = tuple([max(neighbors[0][i], minor_bucket[i]) for x in range(len(minor_bucket))])
+                        merge_target = tuple([max(neighbors[0][i], minor_bucket[i]) for i in range(len(minor_bucket))])
 
                         bucket_cap_map[merge_target] += bucket_cap_map[minor_bucket]
                         del bucket_cap_map[minor_bucket]
