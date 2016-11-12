@@ -197,7 +197,7 @@ class BucketIter(DataIter):
             shape = self.sample_shape(sample)
             shape_cap_map[shape] += 1
 
-        bucket_capacity = sorted(shape_cap_map.iteritems())
+        bucket_capacity = sorted(shape_cap_map.iteritems(), key=lambda x: sum(x[0]))
         max_bucket = tuple(np.max(np.array(shape_cap_map.keys()),axis=0))
         tl = 0
         buckets = []
@@ -223,16 +223,24 @@ class BucketIter(DataIter):
                 bucket_map[bucket] = len(buckets) - 1
                 i += 1
             else:
+                cur_max_bucket = [0] * len(max_bucket)
+                total_cap = 0
+                for check_point in range(i, len(bucket_capacity)):
+                    temp_bucket, temp_cap = bucket_capacity[check_point]
+                    cur_max_bucket = [max(cur_max_bucket[k], temp_bucket[k]) for k in range(len(temp_bucket))]
+                    total_cap += temp_cap
 
-                next_check_point = min(i+batch_size-1, len(bucket_capacity)-1)
-                bucket_after_a_batch = bucket_capacity[next_check_point]
-                head_bucket = [bucket_after_a_batch[j] + max_pad_num for j in range(len(bucket_after_a_batch))]
+                    if total_cap >= batch_size:
+
+                        break
+
+                head_bucket = [cur_max_bucket[k] + max_pad_num for k in range(len(cur_max_bucket))]
                 buckets.append(tuple(head_bucket))
 
-                for j in range(i, next_check_point):
-                    bucket_map[j] = len(buckets) - 1
+                for k in range(i, check_point + 1):
+                    bucket_map[k] = len(buckets) - 1
 
-                i = next_check_point + 1
+                i = check_point + 1
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
