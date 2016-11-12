@@ -197,7 +197,7 @@ class BucketIter(DataIter):
             shape = self.sample_shape(sample)
             shape_cap_map[shape] += 1
 
-        bucket_capacity = sorted(shape_cap_map.iteritems(), key=lambda x: sum(np.array(x[0])))
+        bucket_capacity = sorted(shape_cap_map.iteritems())
         max_bucket = tuple(np.max(np.array(shape_cap_map.keys()),axis=0))
         tl = 0
         buckets = []
@@ -206,41 +206,32 @@ class BucketIter(DataIter):
 
         cur_max_bucket = [0] * len(max_bucket)
         bucket_map = dict()
-        for bucket, cap in bucket_capacity:  # TODO: There are better heuristic ways to do this
 
-            cur_max_bucket = [max(cur_max_bucket[i], bucket[i]) for i in range(len(bucket))]
-            if cap + tl >= batch_size:
-                if not head_bucket:
-                    head_bucket = [min(max_bucket[i], cur_max_bucket[i] + max_pad_num) for i in range(len(bucket))]
-                    head_bucket_update = True
-                else:
-                    diff = min([head_bucket[i] - cur_max_bucket[i] for i in range(len(bucket))])
-                    if diff < 0:
-                        head_bucket = [min(max_bucket[i], cur_max_bucket[i] + max_pad_num) for i in range(len(bucket))]
-                        head_bucket_update = True
+        i = 0
+        while i < len(bucket_capacity):
 
+            bucket, cap = bucket_capacity[i]
+            #cur_max_bucket = [max(cur_max_bucket[i], bucket[i]) for i in range(len(bucket))]
 
-                tl = 0
+            if not head_bucket:
+                assert len(buckets) == 0
+                head_bucket = [bucket[i] + max_pad_num for i in range(len(bucket))]
+                buckets.append(tuple(head_bucket))
 
-                if head_bucket_update:
-                    buckets.append(tuple(head_bucket))
-
-                    head_bucket_update = False
-
-                    bucket_map[bucket] = len(buckets) - 1
-                else:
-
-                    bucket_map[bucket] = len(buckets) - 1 
-
+            diff = min([head_bucket[i] - bucket[i] for i in range(len(bucket))])
+            if diff >= 0:
+                bucket_map[bucket] = len(buckets) - 1
             else:
-                tl += cap
 
-                bucket_map[bucket] = len(buckets) 
+                next_check_point = min(i+batch_size-1, len(bucket_capacity)-1)
+                bucket_after_a_batch = bucket_capacity[next_check_point]
+                head_bucket = [bucket_after_a_batch[j] + max_pad_num for j in range(len(bucket_after_a_batch))]
+                buckets.append(tuple(head_bucket))
 
+                for j in range(i, next_check_point):
+                    bucket_map[j] = len(buckets) - 1
 
-        
-        buckets.append(max_bucket)
-        bucket_map[max_bucket] = len(buckets) - 1
+                i = next_check_point + 1
 
         logging.info("{0} buckets with max capacity {1}".format(len(buckets), max_bucket))
 
