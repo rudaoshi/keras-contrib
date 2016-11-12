@@ -238,7 +238,8 @@ class BucketIter(DataIter):
                 buckets.append(tuple(head_bucket))
 
                 for k in range(i, check_point + 1):
-                    bucket_map[k] = len(buckets) - 1
+                    temp_bucket, _ = bucket_capacity[k]
+                    bucket_map[temp_bucket] = len(buckets) - 1
 
                 i = check_point + 1
 
